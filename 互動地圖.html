@@ -104,8 +104,10 @@ function makeNumIcon(color, num) {
     iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -11]
   });
 }
-const hotelIcon = makeIcon('#2196f3', 14);
-const hotelAltIcon = makeIcon('#7b1fa2', 12);
+const hotelIcon = makeIcon('#2196f3', 14);       // Jesse&Carrie
+const vocusIcon = makeIcon('#7b1fa2', 12);       // vocus 38間
+const diary46Icon = makeIcon('#795548', 12);     // 46天遊記
+const hikingNoteIcon = makeIcon('#e91e63', 12);  // 健行筆記
 const poiIcon = makeIcon('#ff9800', 14);
 
 // ===== DATA =====
@@ -165,7 +167,8 @@ const jcHotels = [
   {name:'Haruno Guest House', lat:33.50, lng:133.49, day:17, ep:14, url:'', note:'設施簡易但便宜'}
 ];
 
-const altHotels = [
+// === vocus 38間住宿（2025實住）===
+const vocusHotels = [
   {name:'HOTEL AZ 德島板野店', lat:34.152, lng:134.475, day:2, ep:1, url:'https://www.az-hotel.com/itano/', note:'¥6,050含早餐；CP值極高'},
   {name:'光明會館', lat:34.121, lng:134.378, day:3, ep:2, url:'https://jyuurakuji.com/', note:'¥10,670兩餐；房間大餐點豐盛'},
   {name:'Sudachi-an', lat:33.988, lng:134.313, day:5, ep:3, url:'https://sudachian.com/', note:'¥7,900兩餐；免費行李寄送'},
@@ -179,18 +182,32 @@ const altHotels = [
   {name:'民宿 とうの浜', lat:33.453, lng:133.988, day:13, ep:11, url:'', note:'¥6,600兩餐；可寄行李攻27番'},
   {name:'Guesthouse Suisennosato', lat:33.575, lng:133.708, day:15, ep:12, url:'', note:'¥5,000素泊；免費早餐行李寄送'},
   {name:'EN Hostel', lat:33.56, lng:133.56, day:16, ep:13, url:'', note:'¥4,140素泊；高知市區'},
-  {name:'ohenrohouse33', lat:33.501, lng:133.544, day:17, ep:14, url:'https://ohenrohouse.com/33contact/', note:'¥5,000素泊；限女性；步行5分到33番'},
-  // === 46天遊記（小歐 2009）===
-  {name:'森本屋', lat:34.14, lng:134.44, day:2, ep:1, url:'', note:'【46天遊記】¥6,000（1餐）；1-5番'},
-  {name:'旅館八幡', lat:34.12, lng:134.38, day:3, ep:2, url:'', note:'【46天遊記】¥7,140（2餐）；6-10番'},
-  {name:'旅館吉野', lat:34.052, lng:134.35, day:4, ep:2, url:'', note:'【46天遊記】¥6,500（3餐！）；11番附近'},
-  {name:'燒山寺宿坊', lat:33.985, lng:134.31, day:5, ep:3, url:'', note:'【46天遊記】¥6,000（2餐）；12番寺內宿坊'},
-  {name:'金子屋', lat:33.97, lng:134.59, day:7, ep:5, url:'', note:'【46天遊記】¥6,200（3餐！）；18-19番'},
-  {name:'山茶花', lat:33.88, lng:134.52, day:8, ep:6, url:'', note:'【46天遊記】¥6,300（2餐）；20-21番'},
-  {name:'內妻莊', lat:33.62, lng:134.35, day:10, ep:8, url:'', note:'【46天遊記】¥6,825（2餐）；23-24番之間'},
-  {name:'ドライブイン27', lat:33.46, lng:133.98, day:13, ep:11, url:'', note:'【46天遊記】¥6,000（2餐）；27番附近'},
-  {name:'高須土佐飯店', lat:33.56, lng:133.62, day:15, ep:12, url:'', note:'【46天遊記】¥9,700/2人；28-30番'},
-  {name:'ビジネスイン土佐', lat:33.55, lng:133.54, day:17, ep:14, url:'', note:'【46天遊記】¥8,500/2人；31-34番'}
+  {name:'ohenrohouse33', lat:33.501, lng:133.544, day:17, ep:14, url:'https://ohenrohouse.com/33contact/', note:'¥5,000素泊；限女性；步行5分到33番'}
+];
+
+// === 46天遊記（小歐 2009 背包客棧）===
+const diary46Hotels = [
+  {name:'森本屋', lat:34.14, lng:134.44, day:2, ep:1, url:'', note:'¥6,000（1餐）；1-5番'},
+  {name:'旅館八幡', lat:34.12, lng:134.38, day:3, ep:2, url:'', note:'¥7,140（2餐）；6-10番'},
+  {name:'旅館吉野', lat:34.052, lng:134.35, day:4, ep:2, url:'', note:'¥6,500（3餐！）；11番附近'},
+  {name:'燒山寺宿坊', lat:33.985, lng:134.31, day:5, ep:3, url:'', note:'¥6,000（2餐）；12番寺內宿坊'},
+  {name:'金子屋', lat:33.97, lng:134.59, day:7, ep:5, url:'', note:'¥6,200（3餐！）；18-19番'},
+  {name:'山茶花', lat:33.88, lng:134.52, day:8, ep:6, url:'', note:'¥6,300（2餐）；20-21番'},
+  {name:'內妻莊', lat:33.62, lng:134.35, day:10, ep:8, url:'', note:'¥6,825（2餐）；23-24番之間'},
+  {name:'ドライブイン27', lat:33.46, lng:133.98, day:13, ep:11, url:'', note:'¥6,000（2餐）；27番附近'},
+  {name:'高須土佐飯店', lat:33.56, lng:133.62, day:15, ep:12, url:'', note:'¥9,700/2人；28-30番'},
+  {name:'ビジネスイン土佐', lat:33.55, lng:133.54, day:17, ep:14, url:'', note:'¥8,500/2人；31-34番'}
+];
+
+// === 健行筆記（德島7天 + 高知11天）===
+const hikingNoteHotels = [
+  {name:'安樂寺宿坊（健行筆記）', lat:34.1185, lng:134.3888, day:2, ep:1, url:'', note:'D1住宿；宿坊體驗'},
+  {name:'旅館吉野（健行筆記）', lat:34.053, lng:134.351, day:3, ep:2, url:'', note:'D2住宿；10番附近'},
+  {name:'神山溫泉飯店', lat:33.99, lng:134.32, day:5, ep:3, url:'', note:'D3住宿；燒山寺後泡溫泉'},
+  {name:'大和Roynet德島', lat:34.074, lng:134.551, day:6, ep:4, url:'', note:'D4住宿；德島市區連鎖'},
+  {name:'鮒の里（健行筆記）', lat:33.969, lng:134.607, day:7, ep:5, url:'', note:'D5住宿；18番附近'},
+  {name:'坂口屋', lat:33.86, lng:134.57, day:8, ep:6, url:'', note:'D6住宿；21番太龍寺後'},
+  {name:'遊庵', lat:33.578, lng:133.706, day:15, ep:12, url:'', note:'高知D4住宿；28番附近'}
 ];
 
 const pois = [
@@ -239,7 +256,9 @@ const dayData = {
 // ===== LAYER GROUPS =====
 const layerTemples = L.layerGroup();
 const layerJCHotels = L.layerGroup();
-const layerAltHotels = L.layerGroup();
+const layerVocusHotels = L.layerGroup();
+const layerDiary46Hotels = L.layerGroup();
+const layerHikingNoteHotels = L.layerGroup();
 const layerPois = L.layerGroup();
 const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
@@ -251,10 +270,12 @@ const layerRouteJC = L.layerGroup();
 // ===== LAYER CONTROL =====
 const overlays = {
   '🔴 札所（1～34番）': layerTemples,
-  '🟢 遍路道：德島段（1～23番）': layerRouteTokushima,
-  '🟠 遍路道：高知段（24～34番）': layerRouteKochi,
-  '🔵 Jesse&Carrie 住宿': layerJCHotels,
-  '🟣 其他推薦住宿': layerAltHotels,
+  '🟢 遍路道：德島段': layerRouteTokushima,
+  '🟠 遍路道：高知段': layerRouteKochi,
+  '🔵 Jesse&Carrie 住宿（2023）': layerJCHotels,
+  '🟣 vocus 38間住宿（2025）': layerVocusHotels,
+  '🟤 46天遊記住宿（2009）': layerDiary46Hotels,
+  '🩷 健行筆記住宿（2019）': layerHikingNoteHotels,
   '🟡 景點 / 注意點': layerPois,
   '🩵 Jesse&Carrie 實際路線': layerRouteJC
 };
@@ -436,7 +457,9 @@ function filterByDay(day) {
   const allItems = [
     ...layerTemples.getLayers(),
     ...layerJCHotels.getLayers(),
-    ...layerAltHotels.getLayers(),
+    ...layerVocusHotels.getLayers(),
+    ...layerDiary46Hotels.getLayers(),
+    ...layerHikingNoteHotels.getLayers(),
     ...layerPois.getLayers()
   ];
 
@@ -466,7 +489,7 @@ function filterByDay(day) {
 function showDayInfo(day) {
   const d = dayData[day];
   const dt = temples.filter(t => t.day === day);
-  const dh = [...jcHotels, ...altHotels].filter(h => h.day === day);
+  const dh = [...jcHotels, ...vocusHotels, ...diary46Hotels, ...hikingNoteHotels].filter(h => h.day === day);
   const dp = pois.filter(p => p.day === day);
   const eps = [...new Set([...dt.map(t=>t.ep), ...dh.map(h=>h.ep)])];
 
@@ -485,7 +508,9 @@ function showDayInfo(day) {
 // ===== INIT =====
 drawTemples();
 drawHotels(jcHotels, layerJCHotels, hotelIcon, '');
-drawHotels(altHotels, layerAltHotels, hotelAltIcon, '【推薦】');
+drawHotels(vocusHotels, layerVocusHotels, vocusIcon, '【vocus】');
+drawHotels(diary46Hotels, layerDiary46Hotels, diary46Icon, '【46天遊記】');
+drawHotels(hikingNoteHotels, layerHikingNoteHotels, hikingNoteIcon, '【健行筆記】');
 drawPois();
 buildDayNav();
 buildRoutes();
