@@ -293,7 +293,7 @@
     </div>
     <!-- Tab C: GPX -->
     <div class="rt-panel" id="panelGpx">
-      <p class="rt-desc"><strong>匯入</strong></p>
+      <p class="rt-desc"><strong>匯入</strong>（支援 .gpx 遍路道軌跡檔）</p>
       <div class="rt-gpx-drop" id="gpxDrop">拖拽 .gpx 檔案到此處<br>或點擊選擇檔案</div>
       <input type="file" id="gpxFile" accept=".gpx" style="display:none">
       <div id="gpxImportInfo"></div>
@@ -494,6 +494,7 @@ const layerMin88 = L.layerGroup();
 const layerPois = L.layerGroup();
 const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
+const layerHenroTrail = L.layerGroup();
 
 const min88Icon = makeIcon('#009688', 8);
 
@@ -527,13 +528,14 @@ const shopCatLabel = {
 };
 
 // Add default visible layers (min88 OFF by default - too many markers, shops OFF by default)
-[layerTemples, layerPois, layerRouteTokushima, layerRouteKochi].forEach(l => l.addTo(map));
+[layerTemples, layerPois, layerHenroTrail].forEach(l => l.addTo(map));
 
 // ===== LAYER CONTROL =====
 const overlays = {
   '🔴 札所（1～34番）': layerTemples,
-  '🟢 遍路道：德島段': layerRouteTokushima,
-  '🟠 遍路道：高知段': layerRouteKochi,
+  '🥾 遍路道（實際路線）': layerHenroTrail,
+  '🟢 遍路道：德島段（OSRM）': layerRouteTokushima,
+  '🟠 遍路道：高知段（OSRM）': layerRouteKochi,
   '🏠 min88 全住宿（142間）': layerMin88,
   '🟡 景點 / 注意點': layerPois,
   '🟢 便利商店': layerConvenience,
@@ -631,12 +633,13 @@ function drawPois() {
 }
 
 // ===== PROGRESS BAR =====
-let totalRoutes = 2;
+let totalRoutes = 3;
 let loadedRoutes = 0;
-function updateProgress() {
+function updateProgress(text) {
   loadedRoutes++;
   const pct = Math.round((loadedRoutes / totalRoutes) * 100);
   document.getElementById('loadingProgress').style.width = pct + '%';
+  if (text) document.getElementById('loadingText').textContent = text;
   if (loadedRoutes >= totalRoutes) {
     setTimeout(() => {
       document.getElementById('loadingBar').style.display = 'none';
@@ -645,20 +648,130 @@ function updateProgress() {
   }
 }
 
+// ===== HENRO TRAIL (OSM Overpass) =====
+const HENRO_RELATIONS = {
+  // 德島段 1-23番 (22 segments)
+  tokushima: [
+    {id:13653654, from:1, to:2}, {id:13676981, from:2, to:3},
+    {id:13676982, from:3, to:4}, {id:13676983, from:4, to:5},
+    {id:13676984, from:5, to:6}, {id:13676985, from:6, to:7},
+    {id:13676987, from:7, to:8}, {id:13669293, from:8, to:9},
+    {id:13669299, from:9, to:10}, {id:13656407, from:10, to:11},
+    {id:13653653, from:11, to:12}, {id:13634172, from:12, to:13},
+    {id:13656408, from:13, to:14}, {id:13669300, from:14, to:15},
+    {id:13669298, from:15, to:16}, {id:13669297, from:16, to:17},
+    {id:13669295, from:17, to:18}, {id:13669292, from:18, to:19},
+    {id:13676986, from:19, to:20}, {id:13676980, from:20, to:21},
+    {id:13676979, from:21, to:22}, {id:13692105, from:22, to:23}
+  ],
+  // 高知段 23-34番 (11 segments)
+  kochi: [
+    {id:13692104, from:23, to:24}, {id:13692101, from:24, to:25},
+    {id:13697430, from:25, to:26}, {id:13697429, from:26, to:27},
+    {id:13697428, from:27, to:28}, {id:13697427, from:28, to:29},
+    {id:13697426, from:29, to:30}, {id:13697425, from:30, to:31},
+    {id:13698056, from:31, to:32}, {id:13698055, from:32, to:33},
+    {id:13698054, from:33, to:34}
+  ]
+};
+
+async function fetchHenroTrail() {
+  // Check localStorage cache first
+  const cacheKey = 'henro_trail_v2';
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const data = JSON.parse(cached);
+      if (data && data.segments && data.segments.length > 0) {
+        drawHenroTrail(data.segments);
+        updateProgress('遍路道已從快取載入');
+        return;
+      }
+    } catch (e) {}
+  }
+
+  document.getElementById('loadingText').textContent = '載入遍路道（OSM）...';
+  const allRelIds = [
+    ...HENRO_RELATIONS.tokushima.map(r => r.id),
+    ...HENRO_RELATIONS.kochi.map(r => r.id)
+  ];
+
+  // Split into batches of ~11 to avoid timeout
+  const batchSize = 11;
+  const segments = [];
+
+  for (let i = 0; i < allRelIds.length; i += batchSize) {
+    const batch = allRelIds.slice(i, i + batchSize);
+    const ids = batch.join(',');
+    const query = `[out:json][timeout:60];relation(id:${ids});out geom;`;
+    const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.elements) {
+        data.elements.forEach(rel => {
+          const coords = [];
+          (rel.members || []).forEach(m => {
+            if (m.type === 'way' && m.geometry) {
+              m.geometry.forEach(p => coords.push([p.lat, p.lon]));
+            }
+          });
+          if (coords.length > 0) {
+            const info = [...HENRO_RELATIONS.tokushima, ...HENRO_RELATIONS.kochi].find(r => r.id === rel.id);
+            segments.push({
+              id: rel.id,
+              from: info ? info.from : 0,
+              to: info ? info.to : 0,
+              name: rel.tags ? rel.tags.name : '',
+              coords
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Overpass batch failed:', e);
+    }
+  }
+
+  if (segments.length > 0) {
+    // Cache to localStorage
+    try { localStorage.setItem(cacheKey, JSON.stringify({ segments, time: Date.now() })); } catch (e) {}
+    drawHenroTrail(segments);
+    updateProgress('遍路道載入完成（' + segments.length + '段）');
+  } else {
+    updateProgress('遍路道載入失敗');
+  }
+}
+
+function drawHenroTrail(segments) {
+  segments.forEach(seg => {
+    if (seg.coords.length < 2) return;
+    const isTokushima = seg.to <= 23;
+    const color = isTokushima ? '#2e7d32' : '#e65100';
+    const line = L.polyline(seg.coords, {
+      color, weight: 4, opacity: 0.85
+    });
+    const label = seg.from + '番→' + seg.to + '番';
+    line.bindPopup(`<div class="popup-content"><strong>遍路道 ${label}</strong><br><span style="font-size:11px;color:#888;">${seg.name || ''}</span><br><span style="font-size:11px;">OSM relation #${seg.id}</span></div>`);
+    layerHenroTrail.addLayer(line);
+  });
+}
+
 // ===== BUILD ROUTES =====
 async function buildRoutes() {
-  // --- Route 1: Tokushima (temples 1-23) ---
+  // --- Real henro trail from OSM ---
+  fetchHenroTrail();
+
+  // --- OSRM fallback routes (hidden by default, available as backup) ---
   const tokWaypoints = temples.filter(t => t.n <= 23).map(t => [t.lat, t.lng]);
   const tokCoords = await fetchRouteSegmented(tokWaypoints, 12);
-  L.polyline(tokCoords, { color: '#2e7d32', weight: 4, opacity: 0.8 }).addTo(layerRouteTokushima);
+  L.polyline(tokCoords, { color: '#2e7d32', weight: 3, opacity: 0.5, dashArray: '8,6' }).addTo(layerRouteTokushima);
   updateProgress();
 
-  // --- Route 2: Kochi (temples 24-34) ---
   const kocWaypoints = temples.filter(t => t.n >= 24).map(t => [t.lat, t.lng]);
   const kocCoords = await fetchRouteSegmented(kocWaypoints, 12);
-  L.polyline(kocCoords, { color: '#e65100', weight: 4, opacity: 0.8 }).addTo(layerRouteKochi);
+  L.polyline(kocCoords, { color: '#e65100', weight: 3, opacity: 0.5, dashArray: '8,6' }).addTo(layerRouteKochi);
   updateProgress();
-
 }
 
 // ===== DAY NAV =====
