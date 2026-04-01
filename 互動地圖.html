@@ -315,6 +315,7 @@
 
 <script src="min88_data.js"></script>
 <script src="shops_data.js"></script>
+<script src="henro_trail.js"></script>
 <script>
 // ===== MAP INIT =====
 const map = L.map('map', { zoomControl: true }).setView([33.85, 134.0], 9);
@@ -498,6 +499,7 @@ const layerPois = L.layerGroup();
 const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
 const layerHenroTrail = L.layerGroup();
+const layerHenroGpx = L.layerGroup();
 
 const min88Icon = makeIcon('#009688', 8);
 
@@ -531,12 +533,13 @@ const shopCatLabel = {
 };
 
 // Add default visible layers (min88 OFF by default - too many markers, shops OFF by default)
-[layerTemples, layerPois, layerHenroTrail].forEach(l => l.addTo(map));
+[layerTemples, layerPois, layerHenroGpx, layerHenroTrail].forEach(l => l.addTo(map));
 
 // ===== LAYER CONTROL =====
 const overlays = {
   '🔴 札所（1～34番）': layerTemples,
-  '🥾 遍路道（實際路線）': layerHenroTrail,
+  '🥾 遍路道 GPX（實走軌跡）': layerHenroGpx,
+  '🗺️ 遍路道 OSM（社群路線）': layerHenroTrail,
   '🟢 遍路道：德島段（OSRM）': layerRouteTokushima,
   '🟠 遍路道：高知段（OSRM）': layerRouteKochi,
   '🏠 min88 全住宿（142間）': layerMin88,
@@ -649,6 +652,15 @@ function updateProgress(text) {
       document.getElementById('loadingText').style.display = 'none';
     }, 500);
   }
+}
+
+// ===== HENRO TRAIL GPX (pre-loaded) =====
+function drawHenroGpxTrail() {
+  if (typeof henroGpxTrail === 'undefined') return;
+  henroGpxTrail.forEach(seg => {
+    if (seg.length < 2) return;
+    L.polyline(seg, { color: '#8b0000', weight: 3, opacity: 0.7 }).addTo(layerHenroGpx);
+  });
 }
 
 // ===== HENRO TRAIL (OSM Overpass) =====
@@ -2039,6 +2051,7 @@ function exportGpx() {
 }
 
 // ===== INIT =====
+drawHenroGpxTrail();
 drawShops();
 drawMin88();
 drawTemples();
