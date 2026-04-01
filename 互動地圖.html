@@ -82,6 +82,7 @@
 </div>
 
 <script src="min88_data.js"></script>
+<script src="shops_data.js"></script>
 <script>
 // ===== MAP INIT =====
 const map = L.map('map', { zoomControl: true }).setView([33.85, 134.0], 9);
@@ -268,7 +269,36 @@ const layerRouteJC = L.layerGroup();
 
 const min88Icon = makeIcon('#009688', 8);
 
-// Add default visible layers (min88 OFF by default - too many markers)
+// Shop/Restaurant layer groups & icons
+const layerConvenience = L.layerGroup();
+const layerRestaurant = L.layerGroup();
+const layerFastfood = L.layerGroup();
+const layerCafe = L.layerGroup();
+const layerSupermarket = L.layerGroup();
+
+const shopIcons = {
+  convenience: makeIcon('#43a047', 10),
+  restaurant: makeIcon('#ef6c00', 10),
+  fastfood: makeIcon('#fdd835', 10),
+  cafe: makeIcon('#6d4c41', 10),
+  supermarket: makeIcon('#1565c0', 10)
+};
+const shopLayers = {
+  convenience: layerConvenience,
+  restaurant: layerRestaurant,
+  fastfood: layerFastfood,
+  cafe: layerCafe,
+  supermarket: layerSupermarket
+};
+const shopCatLabel = {
+  convenience: '便利商店',
+  restaurant: '餐廳',
+  fastfood: '速食',
+  cafe: '咖啡廳',
+  supermarket: '超市'
+};
+
+// Add default visible layers (min88 OFF by default - too many markers, shops OFF by default)
 [layerTemples, layerJCHotels, layerPois, layerRouteTokushima, layerRouteKochi].forEach(l => l.addTo(map));
 
 // ===== LAYER CONTROL =====
@@ -282,7 +312,12 @@ const overlays = {
   '🩷 健行筆記住宿（2019）': layerHikingNoteHotels,
   '🏠 min88 全住宿（142間）': layerMin88,
   '🟡 景點 / 注意點': layerPois,
-  '🩵 Jesse&Carrie 實際路線': layerRouteJC
+  '🩵 Jesse&Carrie 實際路線': layerRouteJC,
+  '🟢 便利商店': layerConvenience,
+  '🍽️ 餐廳': layerRestaurant,
+  '🍔 速食': layerFastfood,
+  '☕ 咖啡廳': layerCafe,
+  '🛒 超市': layerSupermarket
 };
 L.control.layers(null, overlays, { collapsed: false, position: 'bottomright' }).addTo(map);
 
@@ -474,7 +509,12 @@ function filterByDay(day) {
     ...layerDiary46Hotels.getLayers(),
     ...layerHikingNoteHotels.getLayers(),
     ...layerPois.getLayers(),
-    ...layerMin88.getLayers()
+    ...layerMin88.getLayers(),
+    ...layerConvenience.getLayers(),
+    ...layerRestaurant.getLayers(),
+    ...layerFastfood.getLayers(),
+    ...layerCafe.getLayers(),
+    ...layerSupermarket.getLayers()
   ];
 
   allItems.forEach(m => {
@@ -519,6 +559,42 @@ function showDayInfo(day) {
   document.getElementById('infoPanel').style.display = 'block';
 }
 
+// ===== DRAW SHOPS =====
+function drawShops() {
+  if (typeof shops === 'undefined') return;
+  shops.forEach(s => {
+    const layer = shopLayers[s.cat];
+    const icon = shopIcons[s.cat];
+    if (!layer || !icon) return;
+    const gmapUrl = `https://www.google.com/maps?q=${s.lat},${s.lng}`;
+    const catLabel = shopCatLabel[s.cat] || s.cat;
+    const brandHtml = s.brand ? `<div style="font-size:11px;color:#666;">${s.brand}</div>` : '';
+    const nearestTemple = findNearestTemple(s.lat, s.lng);
+    const nearHtml = nearestTemple ? `<div style="font-size:11px;color:#888;margin-top:2px;">最近札所：${nearestTemple.n}番 ${nearestTemple.name}（${nearestTemple.dist}）</div>` : '';
+    const m = L.marker([s.lat, s.lng], {icon}).bindPopup(`
+      <div class="popup-content">
+        <h3>${s.name}</h3>
+        <div class="meta">${catLabel}｜<a href="${gmapUrl}" target="_blank">Google Map</a></div>
+        ${brandHtml}${nearHtml}
+      </div>
+    `);
+    m._data = { day: nearestTemple ? nearestTemple.day : 0 };
+    layer.addLayer(m);
+  });
+}
+
+function findNearestTemple(lat, lng) {
+  let best = null;
+  let bestDist = Infinity;
+  temples.forEach(t => {
+    const d = Math.sqrt(Math.pow(t.lat - lat, 2) + Math.pow(t.lng - lng, 2));
+    if (d < bestDist) { bestDist = d; best = t; }
+  });
+  if (!best) return null;
+  const km = (bestDist * 111).toFixed(1);
+  return { n: best.n, name: best.name, day: best.day, dist: `~${km}km` };
+}
+
 // ===== DRAW MIN88 =====
 function drawMin88() {
   if (typeof min88Inns === 'undefined') return;
@@ -544,6 +620,7 @@ function drawMin88() {
 }
 
 // ===== INIT =====
+drawShops();
 drawMin88();
 drawTemples();
 drawHotels(jcHotels, layerJCHotels, hotelIcon, '');
