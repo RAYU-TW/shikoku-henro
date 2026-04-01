@@ -316,6 +316,7 @@
 <script src="min88_data.js"></script>
 <script src="shops_data.js"></script>
 <script src="henro_trail.js"></script>
+<script src="open_pilgrimage_route.js"></script>
 <script>
 // ===== MAP INIT =====
 const map = L.map('map', { zoomControl: true }).setView([33.85, 134.0], 9);
@@ -500,6 +501,7 @@ const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
 const layerHenroTrail = L.layerGroup();
 const layerHenroGpx = L.layerGroup();
+const layerOpenPilgrimage = L.layerGroup();
 const layerDifficult = L.layerGroup();
 const layerHuts = L.layerGroup();
 
@@ -535,12 +537,13 @@ const shopCatLabel = {
 };
 
 // Add default visible layers (min88 OFF by default - too many markers, shops OFF by default)
-[layerTemples, layerPois, layerHenroGpx, layerHenroTrail].forEach(l => l.addTo(map));
+[layerTemples, layerPois, layerOpenPilgrimage, layerHenroTrail].forEach(l => l.addTo(map));
 
 // ===== LAYER CONTROL =====
 const overlays = {
   '🔴 札所（1～34番）': layerTemples,
   '🥾 遍路道 GPX（實走軌跡）': layerHenroGpx,
+  '📍 Open Pilgrimages（高精度）': layerOpenPilgrimage,
   '🗺️ 遍路道 OSM（社群路線）': layerHenroTrail,
   '⚠️ 困難路段（紫色）': layerDifficult,
   '🛖 遍路小屋 / 休憩所': layerHuts,
@@ -665,6 +668,15 @@ function drawHenroGpxTrail() {
     if (seg.length < 2) return;
     L.polyline(seg, { color: '#8b0000', weight: 3, opacity: 0.7 }).addTo(layerHenroGpx);
   });
+}
+
+// ===== OPEN PILGRIMAGES ROUTE (GitHub: walktalkmeditate) =====
+function drawOpenPilgrimageRoute() {
+  if (typeof openPilgrimageRoute === 'undefined') return;
+  const coords = openPilgrimageRoute.map(p => [p[0], p[1]]);
+  const line = L.polyline(coords, { color: '#0d47a1', weight: 4, opacity: 0.8 });
+  line.bindPopup('<div class="popup-content"><h3>📍 Open Pilgrimages 路線</h3><div style="font-size:12px;color:#888;">來源：walktalkmeditate/open-pilgrimages<br>49,097 GPS 點（降採樣至 4,036 點）<br>含海拔資料・CC BY-SA 4.0 授權</div></div>');
+  layerOpenPilgrimage.addLayer(line);
 }
 
 // ===== DIFFICULT SECTIONS + HENRO HUTS (GitHub: orneh24) =====
@@ -2094,6 +2106,7 @@ function exportGpx() {
 
 // ===== INIT =====
 drawHenroGpxTrail();
+drawOpenPilgrimageRoute();
 loadDifficultSections();
 loadHenroHuts();
 drawShops();
