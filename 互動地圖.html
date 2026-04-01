@@ -494,7 +494,6 @@ const layerMin88 = L.layerGroup();
 const layerPois = L.layerGroup();
 const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
-const layerRouteJC = L.layerGroup();
 
 const min88Icon = makeIcon('#009688', 8);
 
@@ -528,20 +527,15 @@ const shopCatLabel = {
 };
 
 // Add default visible layers (min88 OFF by default - too many markers, shops OFF by default)
-[layerTemples, layerJCHotels, layerPois, layerRouteTokushima, layerRouteKochi].forEach(l => l.addTo(map));
+[layerTemples, layerPois, layerRouteTokushima, layerRouteKochi].forEach(l => l.addTo(map));
 
 // ===== LAYER CONTROL =====
 const overlays = {
   '🔴 札所（1～34番）': layerTemples,
   '🟢 遍路道：德島段': layerRouteTokushima,
   '🟠 遍路道：高知段': layerRouteKochi,
-  '🔵 Jesse&Carrie 住宿（2023）': layerJCHotels,
-  '🟣 vocus 38間住宿（2025）': layerVocusHotels,
-  '🟤 46天遊記住宿（2009）': layerDiary46Hotels,
-  '🩷 健行筆記住宿（2019）': layerHikingNoteHotels,
   '🏠 min88 全住宿（142間）': layerMin88,
   '🟡 景點 / 注意點': layerPois,
-  '🩵 Jesse&Carrie 實際路線': layerRouteJC,
   '🟢 便利商店': layerConvenience,
   '🍽️ 餐廳': layerRestaurant,
   '🍔 速食': layerFastfood,
@@ -637,7 +631,7 @@ function drawPois() {
 }
 
 // ===== PROGRESS BAR =====
-let totalRoutes = 3;
+let totalRoutes = 2;
 let loadedRoutes = 0;
 function updateProgress() {
   loadedRoutes++;
@@ -665,44 +659,6 @@ async function buildRoutes() {
   L.polyline(kocCoords, { color: '#e65100', weight: 4, opacity: 0.8 }).addTo(layerRouteKochi);
   updateProgress();
 
-  // --- Route 3: Jesse & Carrie actual path (hotels in chronological order) ---
-  const jcStops = [
-    {lat:34.162, lng:134.505},       // Day1 大鳥居苑
-    {lat:34.159803, lng:134.502592}, // 1番
-    {lat:34.118056, lng:134.388389}, // 6番→安樂寺宿坊
-    {lat:34.12075, lng:134.377925},  // 7番
-    {lat:34.10775, lng:134.304278},  // 10番
-    {lat:34.053, lng:134.35},        // あわらくや
-    {lat:34.051667, lng:134.3485},   // 11番
-    {lat:33.985028, lng:134.31025},  // 12番
-    {lat:33.987, lng:134.312},       // すたち庵
-    {lat:34.038117, lng:134.462683}, // 13番
-    {lat:34.068472, lng:134.474344}, // 16番
-    {lat:34.067, lng:134.474},       // 麟樓
-    {lat:34.085167, lng:134.485444}, // 17番
-    {lat:33.967861, lng:134.605806}, // 19番→鮒の里
-    {lat:33.913861, lng:134.505611}, // 20番
-    {lat:33.851833, lng:134.582778}, // 22番→パンダヤ
-    {lat:33.732306, lng:134.527583}, // 23番→壱 HOSTEL
-    {lat:33.542, lng:134.298},       // 波流月
-    {lat:33.249008, lng:134.175739}, // 24番
-    {lat:33.25, lng:134.177},        // Sakurahome
-    {lat:33.307222, lng:134.122861}, // 26番
-    {lat:33.288, lng:134.149},       // うらしま
-    {lat:33.467611, lng:133.974778}, // 27番
-    {lat:33.428, lng:134.023},       // Hotel Nahari
-    {lat:33.498, lng:133.906},       // Hotel Tamai
-    {lat:33.577583, lng:133.705389}, // 28番
-    {lat:33.569, lng:133.693},       // 高知黑潮
-    {lat:33.598694, lng:133.640417}, // 29番
-    {lat:33.546611, lng:133.577472}, // 31番→Dormy Inn
-    {lat:33.526694, lng:133.611389}, // 32番
-    {lat:33.491722, lng:133.487583}, // 34番→Haruno
-  ];
-  const jcWaypoints = jcStops.map(s => [s.lat, s.lng]);
-  const jcCoords = await fetchRouteSegmented(jcWaypoints, 8);
-  L.polyline(jcCoords, { color: '#0288d1', weight: 3, opacity: 0.7, dashArray: '10,6' }).addTo(layerRouteJC);
-  updateProgress();
 }
 
 // ===== DAY NAV =====
