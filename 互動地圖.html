@@ -66,6 +66,97 @@
 
   .leaflet-control-layers { font-family: "Microsoft JhengHei", sans-serif; font-size: 13px; }
   .leaflet-control-layers-expanded { padding: 8px 12px; min-width: 220px; }
+
+  /* Route Toolbar */
+  .rt-toggle {
+    position: absolute; top: 50%; left: 10px; transform: translateY(-50%);
+    z-index: 1000; width: 44px; height: 44px; border-radius: 50%;
+    background: #1976d2; color: white; border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
+  }
+  .rt-toggle:hover { background: #1565c0; }
+  .rt-toolbar {
+    position: absolute; top: 60px; left: 10px; z-index: 1001;
+    width: 320px; max-height: calc(100vh - 80px);
+    background: white; border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .rt-toolbar.hidden { display: none; }
+  .rt-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; border-bottom: 1px solid #eee; flex-shrink: 0;
+  }
+  .rt-header strong { font-size: 15px; }
+  .rt-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #999; }
+  .rt-close:hover { color: #333; }
+  .rt-tabs {
+    display: flex; border-bottom: 1px solid #eee; flex-shrink: 0;
+  }
+  .rt-tab {
+    flex: 1; padding: 8px 4px; border: none; background: none; cursor: pointer;
+    font-size: 13px; font-family: inherit; color: #666;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .rt-tab:hover { color: #1976d2; background: #f5f9ff; }
+  .rt-tab.active { color: #1976d2; font-weight: bold; border-bottom-color: #1976d2; }
+  .rt-body { overflow-y: auto; flex: 1; }
+  .rt-panel { display: none; padding: 14px; }
+  .rt-panel.active { display: block; }
+  .rt-desc { font-size: 12px; color: #888; margin-bottom: 10px; line-height: 1.5; }
+  .rt-btn {
+    width: 100%; padding: 9px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 14px; font-family: inherit; transition: all 0.15s;
+  }
+  .rt-btn-primary { background: #1976d2; color: white; }
+  .rt-btn-primary:hover { background: #1565c0; }
+  .rt-btn-primary.editing { background: #c62828; }
+  .rt-btn-primary.editing:hover { background: #b71c1c; }
+  .rt-btn-secondary { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+  .rt-btn-secondary:hover { background: #e0e0e0; }
+  .rt-stats {
+    margin-top: 10px; padding: 10px; background: #f8f9fa;
+    border-radius: 6px; font-size: 13px; line-height: 1.8;
+  }
+  .rt-stats strong { color: #1976d2; }
+  .rt-wp-list { margin-top: 8px; font-size: 12px; }
+  .rt-wp-item {
+    display: flex; align-items: center; gap: 6px; padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .rt-wp-num {
+    width: 22px; height: 22px; border-radius: 50%; background: #1976d2;
+    color: white; font-size: 10px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .rt-wp-del { background: none; border: none; color: #c62828; cursor: pointer; margin-left: auto; font-size: 14px; }
+  .rt-hotel-list { max-height: 45vh; overflow-y: auto; }
+  .rt-hotel-group { font-size: 12px; font-weight: bold; color: #1976d2; padding: 8px 0 4px; border-bottom: 1px solid #e3f2fd; }
+  .rt-hotel-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 2px;
+    border-bottom: 1px solid #f5f5f5; font-size: 13px; cursor: pointer;
+  }
+  .rt-hotel-item:hover { background: #f5f9ff; }
+  .rt-hotel-item input { flex-shrink: 0; }
+  .rt-hotel-src { font-size: 10px; color: #999; }
+  .rt-day-segment { margin-top: 6px; padding: 6px 8px; background: #fff8e1; border-radius: 4px; font-size: 12px; line-height: 1.6; }
+  .rt-gpx-drop {
+    border: 2px dashed #ccc; border-radius: 8px; padding: 24px 16px;
+    text-align: center; color: #999; cursor: pointer; transition: all 0.2s;
+    font-size: 13px; margin-bottom: 12px;
+  }
+  .rt-gpx-drop.dragover { border-color: #1976d2; background: #e3f2fd; color: #1976d2; }
+  .rt-loading { text-align: center; padding: 8px; color: #1976d2; font-size: 13px; }
+
+  @media (max-width: 640px) {
+    .rt-toggle { top: auto; bottom: 20px; left: 10px; transform: none; }
+    .rt-toolbar {
+      top: auto; bottom: 0; left: 0; width: 100vw;
+      max-height: 55vh; border-radius: 14px 14px 0 0;
+    }
+    .day-nav { max-width: calc(100vw - 120px); }
+  }
 </style>
 </head>
 <body>
@@ -75,6 +166,62 @@
 <div id="loadingText">載入步行路線中...</div>
 
 <div class="day-nav" id="dayNav"></div>
+
+<!-- Route Toolbar -->
+<button class="rt-toggle" id="rtToggle" title="自訂路線工具">&#9937;</button>
+<div class="rt-toolbar hidden" id="rtToolbar">
+  <div class="rt-header">
+    <strong>自訂路線</strong>
+    <button class="rt-close" id="rtClose">&times;</button>
+  </div>
+  <div class="rt-tabs">
+    <button class="rt-tab active" data-tab="editor">途經點</button>
+    <button class="rt-tab" data-tab="planner">住宿規劃</button>
+    <button class="rt-tab" data-tab="gpx">GPX</button>
+  </div>
+  <div class="rt-body">
+    <!-- Tab A: Waypoint Editor -->
+    <div class="rt-panel active" id="panelEditor">
+      <p class="rt-desc">點擊「開始編輯」後，在地圖上點擊新增途經點。<br>拖曳可移動位置，點擊 ✕ 可刪除。</p>
+      <button class="rt-btn rt-btn-primary" id="btnToggleEdit">開始編輯</button>
+      <div class="rt-stats" id="editorStats" style="display:none;">
+        距離：<strong id="statDist">0 km</strong><br>
+        預估時間：<strong id="statTime">0h 0m</strong><br>
+        途經點：<strong id="statPts">0</strong>
+      </div>
+      <div class="rt-wp-list" id="wpList"></div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="rt-btn rt-btn-secondary" style="flex:1" onclick="undoWaypoint()">撤銷</button>
+        <button class="rt-btn rt-btn-secondary" style="flex:1" onclick="clearWaypoints()">清除全部</button>
+      </div>
+    </div>
+    <!-- Tab B: Hotel Planner -->
+    <div class="rt-panel" id="panelPlanner">
+      <p class="rt-desc">勾選預計入住的住宿，系統自動串接札所產生路線。</p>
+      <select id="hotelSrcFilter" style="width:100%;padding:6px;margin-bottom:8px;border:1px solid #ddd;border-radius:4px;font-family:inherit;">
+        <option value="all">所有來源</option>
+        <option value="jc">Jesse&Carrie (2023)</option>
+        <option value="vocus">vocus 38間 (2025)</option>
+        <option value="d46">46天遊記 (2009)</option>
+        <option value="hk">健行筆記 (2019)</option>
+      </select>
+      <div class="rt-hotel-list" id="hotelList"></div>
+      <button class="rt-btn rt-btn-primary" style="margin-top:8px" onclick="generatePlanRoute()">產生路線</button>
+      <div id="planStats"></div>
+    </div>
+    <!-- Tab C: GPX -->
+    <div class="rt-panel" id="panelGpx">
+      <p class="rt-desc"><strong>匯入</strong></p>
+      <div class="rt-gpx-drop" id="gpxDrop">拖拽 .gpx 檔案到此處<br>或點擊選擇檔案</div>
+      <input type="file" id="gpxFile" accept=".gpx" style="display:none">
+      <div id="gpxImportInfo"></div>
+      <hr style="margin:14px 0;border:none;border-top:1px solid #eee;">
+      <p class="rt-desc"><strong>匯出</strong>（將目前自訂路線匯出為 GPX）</p>
+      <input type="text" id="gpxName" value="shikoku-henro-route" placeholder="檔案名稱" style="width:100%;padding:6px;margin-bottom:8px;border:1px solid #ddd;border-radius:4px;font-family:inherit;">
+      <button class="rt-btn rt-btn-primary" onclick="exportGpx()">匯出 GPX</button>
+    </div>
+  </div>
+</div>
 
 <div class="info-panel" id="infoPanel" style="display:none">
   <button class="close-btn" onclick="document.getElementById('infoPanel').style.display='none'">&times;</button>
@@ -619,6 +766,460 @@ function drawMin88() {
   });
 }
 
+// ===== ROUTE TOOLBAR UI =====
+document.getElementById('rtToggle').onclick = () => {
+  document.getElementById('rtToolbar').classList.toggle('hidden');
+};
+document.getElementById('rtClose').onclick = () => {
+  document.getElementById('rtToolbar').classList.add('hidden');
+};
+document.querySelectorAll('.rt-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.rt-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.rt-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).classList.add('active');
+    if (tab.dataset.tab !== 'editor' && rtEditor.active) toggleEditMode();
+  };
+});
+
+// ===== ROUTE EDITOR (Feature A) =====
+const rtEditor = {
+  active: false,
+  waypoints: [],
+  routeLayer: L.layerGroup().addTo(map),
+  markerLayer: L.layerGroup().addTo(map),
+  totalDist: 0,
+  totalTime: 0,
+  debounce: null
+};
+
+function toggleEditMode() {
+  rtEditor.active = !rtEditor.active;
+  const btn = document.getElementById('btnToggleEdit');
+  if (rtEditor.active) {
+    btn.textContent = '停止編輯';
+    btn.classList.add('editing');
+    map.getContainer().style.cursor = 'crosshair';
+    map.on('click', onMapAddWp);
+  } else {
+    btn.textContent = '開始編輯';
+    btn.classList.remove('editing');
+    map.getContainer().style.cursor = '';
+    map.off('click', onMapAddWp);
+  }
+}
+document.getElementById('btnToggleEdit').onclick = toggleEditMode;
+
+function onMapAddWp(e) {
+  addWaypoint(e.latlng.lat, e.latlng.lng);
+}
+
+function addWaypoint(lat, lng) {
+  const idx = rtEditor.waypoints.length;
+  const icon = makeNumIcon('#1976d2', idx + 1);
+  const m = L.marker([lat, lng], { icon, draggable: true });
+  m.bindPopup(`<button onclick="removeWaypointByMarker(this)" style="padding:4px 10px;cursor:pointer;">刪除此途經點</button>`);
+  m.on('dragend', () => { recalcRoute(); });
+  rtEditor.markerLayer.addLayer(m);
+  rtEditor.waypoints.push({ lat, lng, marker: m });
+  recalcRoute();
+}
+
+function removeWaypointByMarker(btnEl) {
+  // find marker whose popup is open
+  const idx = rtEditor.waypoints.findIndex(w => w.marker.isPopupOpen());
+  if (idx >= 0) removeWaypoint(idx);
+}
+
+function removeWaypoint(idx) {
+  const wp = rtEditor.waypoints[idx];
+  if (wp) rtEditor.markerLayer.removeLayer(wp.marker);
+  rtEditor.waypoints.splice(idx, 1);
+  renumberWaypoints();
+  recalcRoute();
+}
+
+function renumberWaypoints() {
+  rtEditor.waypoints.forEach((wp, i) => {
+    wp.marker.setIcon(makeNumIcon('#1976d2', i + 1));
+    wp.lat = wp.marker.getLatLng().lat;
+    wp.lng = wp.marker.getLatLng().lng;
+  });
+}
+
+function undoWaypoint() {
+  if (rtEditor.waypoints.length === 0) return;
+  removeWaypoint(rtEditor.waypoints.length - 1);
+}
+
+function clearWaypoints() {
+  rtEditor.markerLayer.clearLayers();
+  rtEditor.routeLayer.clearLayers();
+  rtEditor.waypoints = [];
+  rtEditor.totalDist = 0;
+  rtEditor.totalTime = 0;
+  updateEditorStats();
+  document.getElementById('wpList').innerHTML = '';
+  localStorage.removeItem('henro_wp');
+}
+
+async function recalcRoute() {
+  clearTimeout(rtEditor.debounce);
+  rtEditor.debounce = setTimeout(async () => {
+    renumberWaypoints();
+    rtEditor.routeLayer.clearLayers();
+    const pts = rtEditor.waypoints.map(w => [w.marker.getLatLng().lat, w.marker.getLatLng().lng]);
+    if (pts.length < 2) {
+      rtEditor.totalDist = 0;
+      rtEditor.totalTime = 0;
+      updateEditorStats();
+      updateWpList();
+      saveEditorState();
+      return;
+    }
+    document.getElementById('editorStats').style.display = '';
+    try {
+      const result = await fetchRouteWithStats(pts);
+      if (result) {
+        L.polyline(result.coords, { color: '#d32f2f', weight: 4, opacity: 0.85 }).addTo(rtEditor.routeLayer);
+        rtEditor.totalDist = result.distance;
+        rtEditor.totalTime = result.duration;
+      }
+    } catch (e) {
+      // fallback: straight lines
+      L.polyline(pts, { color: '#d32f2f', weight: 3, opacity: 0.6, dashArray: '6,6' }).addTo(rtEditor.routeLayer);
+    }
+    updateEditorStats();
+    updateWpList();
+    saveEditorState();
+  }, 400);
+}
+
+async function fetchRouteWithStats(waypoints) {
+  if (waypoints.length > 25) {
+    // segmented
+    let allCoords = [], totalDist = 0, totalDur = 0;
+    for (let i = 0; i < waypoints.length - 1; i += 20) {
+      const chunk = waypoints.slice(i, i + 21);
+      if (chunk.length < 2) break;
+      const r = await fetchSingleRouteWithStats(chunk);
+      if (r) {
+        if (allCoords.length > 0) r.coords.shift();
+        allCoords.push(...r.coords);
+        totalDist += r.distance;
+        totalDur += r.duration;
+      }
+    }
+    return { coords: allCoords, distance: totalDist, duration: totalDur };
+  }
+  return await fetchSingleRouteWithStats(waypoints);
+}
+
+async function fetchSingleRouteWithStats(waypoints) {
+  const coords = waypoints.map(p => `${p[1]},${p[0]}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.code === 'Ok' && data.routes && data.routes[0]) {
+    const r = data.routes[0];
+    return {
+      coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+      distance: r.distance,
+      duration: r.duration,
+      legs: r.legs || []
+    };
+  }
+  return null;
+}
+
+function updateEditorStats() {
+  const statsEl = document.getElementById('editorStats');
+  const n = rtEditor.waypoints.length;
+  if (n === 0) { statsEl.style.display = 'none'; return; }
+  statsEl.style.display = '';
+  const km = (rtEditor.totalDist / 1000).toFixed(1);
+  const h = Math.floor(rtEditor.totalTime / 3600);
+  const m = Math.round((rtEditor.totalTime % 3600) / 60);
+  document.getElementById('statDist').textContent = km + ' km';
+  document.getElementById('statTime').textContent = h + 'h ' + m + 'm';
+  document.getElementById('statPts').textContent = n;
+}
+
+function updateWpList() {
+  const el = document.getElementById('wpList');
+  el.innerHTML = rtEditor.waypoints.map((wp, i) => {
+    const near = findNearestTemple(wp.marker.getLatLng().lat, wp.marker.getLatLng().lng);
+    const nearTxt = near ? near.n + '番' + near.name : '';
+    return `<div class="rt-wp-item">
+      <span class="rt-wp-num">${i + 1}</span>
+      <span>${nearTxt} <span style="color:#aaa;font-size:11px;">(${wp.marker.getLatLng().lat.toFixed(4)}, ${wp.marker.getLatLng().lng.toFixed(4)})</span></span>
+      <button class="rt-wp-del" onclick="removeWaypoint(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function saveEditorState() {
+  const data = rtEditor.waypoints.map(w => [w.marker.getLatLng().lat, w.marker.getLatLng().lng]);
+  localStorage.setItem('henro_wp', JSON.stringify(data));
+}
+
+function loadEditorState() {
+  try {
+    const data = JSON.parse(localStorage.getItem('henro_wp'));
+    if (data && data.length) data.forEach(p => addWaypoint(p[0], p[1]));
+  } catch (e) {}
+}
+
+// ===== HOTEL PLANNER (Feature B) =====
+const planRoute = { layer: L.layerGroup().addTo(map), highlightLayer: L.layerGroup().addTo(map) };
+
+function buildHotelList() {
+  const all = [
+    ...jcHotels.map(h => ({...h, src: 'jc', srcLabel: 'J&C'})),
+    ...vocusHotels.map(h => ({...h, src: 'vocus', srcLabel: 'vocus'})),
+    ...diary46Hotels.map(h => ({...h, src: 'd46', srcLabel: '46天'})),
+    ...hikingNoteHotels.map(h => ({...h, src: 'hk', srcLabel: '健行'}))
+  ].sort((a, b) => a.day - b.day || a.src.localeCompare(b.src));
+
+  const saved = JSON.parse(localStorage.getItem('henro_plan') || '[]');
+  const el = document.getElementById('hotelList');
+  let html = '', lastDay = -1;
+  all.forEach((h, i) => {
+    if (h.day !== lastDay) {
+      const dd = dayData[h.day];
+      html += `<div class="rt-hotel-group">Day ${h.day}${dd ? ' — ' + dd.date + ', ' + dd.dist : ''}</div>`;
+      lastDay = h.day;
+    }
+    const id = 'ph_' + i;
+    const checked = saved.includes(h.name) ? 'checked' : '';
+    html += `<label class="rt-hotel-item" data-src="${h.src}">
+      <input type="checkbox" id="${id}" value="${i}" ${checked} onchange="onHotelCheck()">
+      <span>${h.name} <span class="rt-hotel-src">[${h.srcLabel}]</span></span>
+    </label>`;
+  });
+  el.innerHTML = html;
+  el._allHotels = all;
+
+  document.getElementById('hotelSrcFilter').onchange = (e) => {
+    const v = e.target.value;
+    el.querySelectorAll('.rt-hotel-item').forEach(item => {
+      item.style.display = (v === 'all' || item.dataset.src === v) ? '' : 'none';
+    });
+  };
+}
+
+function onHotelCheck() {
+  const el = document.getElementById('hotelList');
+  const all = el._allHotels;
+  const selected = [];
+  el.querySelectorAll('input:checked').forEach(cb => selected.push(all[cb.value].name));
+  localStorage.setItem('henro_plan', JSON.stringify(selected));
+
+  // highlight on map
+  planRoute.highlightLayer.clearLayers();
+  el.querySelectorAll('input:checked').forEach(cb => {
+    const h = all[cb.value];
+    const ring = L.circleMarker([h.lat, h.lng], { radius: 14, color: '#d32f2f', weight: 2, fillColor: '#ff5252', fillOpacity: 0.3 });
+    planRoute.highlightLayer.addLayer(ring);
+  });
+}
+
+function getSelectedHotels() {
+  const el = document.getElementById('hotelList');
+  const all = el._allHotels;
+  const selected = [];
+  el.querySelectorAll('input:checked').forEach(cb => selected.push(all[cb.value]));
+  return selected.sort((a, b) => a.day - b.day);
+}
+
+async function generatePlanRoute() {
+  const hotels = getSelectedHotels();
+  if (hotels.length < 1) { alert('請至少勾選一間住宿'); return; }
+
+  planRoute.layer.clearLayers();
+  document.getElementById('planStats').innerHTML = '<div class="rt-loading">路線計算中...</div>';
+
+  // Build waypoints: for each day range, insert temples + hotel as endpoint
+  const days = [...new Set(hotels.map(h => h.day))].sort((a, b) => a - b);
+  const waypoints = [];
+  const segments = []; // {day, startName, endName, wpStart, wpEnd}
+
+  for (let di = 0; di < days.length; di++) {
+    const day = days[di];
+    const prevDay = di > 0 ? days[di - 1] : null;
+    const dayTemples = temples.filter(t => {
+      if (prevDay !== null) return t.day > prevDay && t.day <= day;
+      return t.day <= day;
+    });
+    const dayHotel = hotels.filter(h => h.day === day);
+
+    const startIdx = waypoints.length;
+    dayTemples.forEach(t => waypoints.push([t.lat, t.lng]));
+    dayHotel.forEach(h => waypoints.push([h.lat, h.lng]));
+    const endIdx = waypoints.length;
+
+    const startName = di > 0 ? hotels.filter(h => h.day === prevDay).map(h => h.name).join('/') : '起點';
+    const endName = dayHotel.map(h => h.name).join('/');
+    segments.push({ day, startName, endName, wpStart: startIdx, wpEnd: endIdx });
+  }
+
+  if (waypoints.length < 2) { document.getElementById('planStats').innerHTML = ''; return; }
+
+  try {
+    const result = await fetchRouteWithStats(waypoints);
+    if (result) {
+      L.polyline(result.coords, { color: '#6a1b9a', weight: 4, opacity: 0.85 }).addTo(planRoute.layer);
+
+      // calculate per-segment distances using legs
+      let html = '<div class="rt-stats" style="margin-top:10px;"><strong>每日分段</strong></div>';
+      const totalKm = (result.distance / 1000).toFixed(1);
+      const totalH = Math.floor(result.duration / 3600);
+      const totalM = Math.round((result.duration % 3600) / 60);
+      html += `<div class="rt-stats">總距離：<strong>${totalKm} km</strong>　預估：<strong>${totalH}h ${totalM}m</strong></div>`;
+
+      if (result.legs && result.legs.length > 0) {
+        segments.forEach(seg => {
+          let segDist = 0;
+          for (let li = Math.max(0, seg.wpStart); li < Math.min(seg.wpEnd - 1, result.legs.length); li++) {
+            segDist += result.legs[li].distance;
+          }
+          const km = (segDist / 1000).toFixed(1);
+          html += `<div class="rt-day-segment">Day ${seg.day}：<strong>${km} km</strong>（${seg.startName} → ${seg.endName}）</div>`;
+        });
+      }
+      document.getElementById('planStats').innerHTML = html;
+    }
+  } catch (e) {
+    document.getElementById('planStats').innerHTML = '<div style="color:#c62828;">路線計算失敗，請稍後重試</div>';
+  }
+}
+
+// ===== GPX IMPORT/EXPORT (Feature C) =====
+const gpxLayer = L.layerGroup().addTo(map);
+
+(function initGpx() {
+  const drop = document.getElementById('gpxDrop');
+  const fileInput = document.getElementById('gpxFile');
+
+  drop.onclick = () => fileInput.click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('dragover'); };
+  drop.ondragleave = () => drop.classList.remove('dragover');
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('dragover'); if (e.dataTransfer.files[0]) parseGpx(e.dataTransfer.files[0]); };
+  fileInput.onchange = () => { if (fileInput.files[0]) parseGpx(fileInput.files[0]); };
+})();
+
+function parseGpx(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(e.target.result, 'text/xml');
+    const points = [];
+
+    // Try <trk> first
+    doc.querySelectorAll('trkpt').forEach(pt => {
+      points.push([parseFloat(pt.getAttribute('lat')), parseFloat(pt.getAttribute('lon'))]);
+    });
+    // Try <rte> if no tracks
+    if (points.length === 0) {
+      doc.querySelectorAll('rtept').forEach(pt => {
+        points.push([parseFloat(pt.getAttribute('lat')), parseFloat(pt.getAttribute('lon'))]);
+      });
+    }
+    // Also collect <wpt>
+    const wpts = [];
+    doc.querySelectorAll('wpt').forEach(pt => {
+      const name = pt.querySelector('name')?.textContent || '';
+      wpts.push({ lat: parseFloat(pt.getAttribute('lat')), lng: parseFloat(pt.getAttribute('lon')), name });
+    });
+
+    if (points.length === 0 && wpts.length === 0) {
+      document.getElementById('gpxImportInfo').innerHTML = '<div style="color:#c62828;">無法解析此 GPX 檔案</div>';
+      return;
+    }
+
+    gpxLayer.clearLayers();
+    if (points.length > 0) {
+      // downsample if too many points
+      const display = points.length > 3000 ? points.filter((_, i) => i % Math.ceil(points.length / 2000) === 0) : points;
+      const line = L.polyline(display, { color: '#00897b', weight: 4, opacity: 0.9 });
+      gpxLayer.addLayer(line);
+      map.fitBounds(line.getBounds().pad(0.1));
+    }
+    wpts.forEach(w => {
+      const m = L.marker([w.lat, w.lng], { icon: makeIcon('#00897b', 10) });
+      if (w.name) m.bindPopup(`<b>${w.name}</b>`);
+      gpxLayer.addLayer(m);
+    });
+
+    const nameEl = doc.querySelector('metadata name, trk name');
+    const gpxName = nameEl ? nameEl.textContent : file.name;
+    document.getElementById('gpxImportInfo').innerHTML = `
+      <div class="rt-stats">
+        <strong>${gpxName}</strong><br>
+        軌跡點：${points.length}　航點：${wpts.length}<br>
+        <button class="rt-btn rt-btn-secondary" style="margin-top:6px;width:auto;padding:4px 12px;" onclick="clearGpxImport()">清除匯入</button>
+        ${points.length > 0 ? `<button class="rt-btn rt-btn-secondary" style="margin-top:6px;width:auto;padding:4px 12px;margin-left:4px;" onclick="gpxToWaypoints()">轉為途經點</button>` : ''}
+      </div>
+    `;
+    document.getElementById('gpxImportInfo')._points = points;
+  };
+  reader.readAsText(file);
+}
+
+function clearGpxImport() {
+  gpxLayer.clearLayers();
+  document.getElementById('gpxImportInfo').innerHTML = '';
+}
+
+function gpxToWaypoints() {
+  const points = document.getElementById('gpxImportInfo')._points;
+  if (!points || points.length === 0) return;
+  clearWaypoints();
+  // sample ~20 waypoints from GPX track
+  const step = Math.max(1, Math.floor(points.length / 20));
+  for (let i = 0; i < points.length; i += step) {
+    addWaypoint(points[i][0], points[i][1]);
+  }
+  // always include last point
+  const last = points[points.length - 1];
+  if (rtEditor.waypoints.length === 0 || rtEditor.waypoints[rtEditor.waypoints.length - 1].lat !== last[0]) {
+    addWaypoint(last[0], last[1]);
+  }
+  // switch to editor tab
+  document.querySelectorAll('.rt-tab')[0].click();
+}
+
+function exportGpx() {
+  // collect all route coords from editor or planner
+  let coords = [];
+  rtEditor.routeLayer.eachLayer(l => { if (l.getLatLngs) coords.push(...l.getLatLngs()); });
+  if (coords.length === 0) planRoute.layer.eachLayer(l => { if (l.getLatLngs) coords.push(...l.getLatLngs()); });
+  if (coords.length === 0) gpxLayer.eachLayer(l => { if (l.getLatLngs) coords.push(...l.getLatLngs()); });
+  if (coords.length === 0) { alert('目前沒有可匯出的路線'); return; }
+
+  const name = document.getElementById('gpxName').value || 'route';
+  let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="四國遍路互動地圖" xmlns="http://www.topografix.com/GPX/1/1">\n<metadata><name>${name}</name><time>${new Date().toISOString()}</time></metadata>\n`;
+
+  // waypoints
+  rtEditor.waypoints.forEach((wp, i) => {
+    const ll = wp.marker.getLatLng();
+    gpx += `<wpt lat="${ll.lat}" lon="${ll.lng}"><name>WP${i + 1}</name></wpt>\n`;
+  });
+
+  // track
+  gpx += `<trk><name>${name}</name><trkseg>\n`;
+  coords.forEach(c => { gpx += `<trkpt lat="${c.lat}" lon="${c.lng}"></trkpt>\n`; });
+  gpx += `</trkseg></trk>\n</gpx>`;
+
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.gpx';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 // ===== INIT =====
 drawShops();
 drawMin88();
@@ -632,6 +1233,10 @@ buildDayNav();
 buildRoutes();
 
 map.fitBounds(L.latLngBounds(temples.map(t => [t.lat, t.lng])).pad(0.1));
+
+// Route toolbar init
+buildHotelList();
+loadEditorState();
 </script>
 </body>
 </html>
