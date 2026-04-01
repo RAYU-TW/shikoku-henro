@@ -187,7 +187,8 @@
       <div class="rt-stats" id="editorStats" style="display:none;">
         距離：<strong id="statDist">0 km</strong><br>
         預估時間：<strong id="statTime">0h 0m</strong><br>
-        途經點：<strong id="statPts">0</strong>
+        途經點：<strong id="statPts">0</strong><br>
+        <span id="statElev"></span>
       </div>
       <div class="rt-wp-list" id="wpList"></div>
       <div style="display:flex;gap:6px;margin-top:8px;">
@@ -791,7 +792,10 @@ const rtEditor = {
   markerLayer: L.layerGroup().addTo(map),
   totalDist: 0,
   totalTime: 0,
-  debounce: null
+  legs: [],        // per-segment {distance, duration}
+  elevations: [],  // elevation (m) per waypoint
+  debounce: null,
+  elevDebounce: null
 };
 
 function toggleEditMode() {
@@ -888,6 +892,8 @@ function clearWaypoints() {
   rtEditor.waypoints = [];
   rtEditor.totalDist = 0;
   rtEditor.totalTime = 0;
+  rtEditor.legs = [];
+  rtEditor.elevations = [];
   updateEditorStats();
   document.getElementById('wpList').innerHTML = '';
   localStorage.removeItem('henro_wp');
@@ -898,10 +904,12 @@ async function recalcRoute() {
   rtEditor.debounce = setTimeout(async () => {
     renumberWaypoints();
     rtEditor.routeLayer.clearLayers();
+    rtEditor.legs = [];
     const pts = rtEditor.waypoints.map(w => [w.marker.getLatLng().lat, w.marker.getLatLng().lng]);
     if (pts.length < 2) {
       rtEditor.totalDist = 0;
       rtEditor.totalTime = 0;
+      rtEditor.legs = [];
       updateEditorStats();
       updateWpList();
       saveEditorState();
@@ -914,21 +922,21 @@ async function recalcRoute() {
         L.polyline(result.coords, { color: '#d32f2f', weight: 4, opacity: 0.85 }).addTo(rtEditor.routeLayer);
         rtEditor.totalDist = result.distance;
         rtEditor.totalTime = result.duration;
+        rtEditor.legs = (result.legs || []).map(l => ({ distance: l.distance, duration: l.duration }));
       }
     } catch (e) {
-      // fallback: straight lines
       L.polyline(pts, { color: '#d32f2f', weight: 3, opacity: 0.6, dashArray: '6,6' }).addTo(rtEditor.routeLayer);
     }
     updateEditorStats();
     updateWpList();
     saveEditorState();
+    fetchElevations();
   }, 400);
 }
 
 async function fetchRouteWithStats(waypoints) {
   if (waypoints.length > 25) {
-    // segmented
-    let allCoords = [], totalDist = 0, totalDur = 0;
+    let allCoords = [], totalDist = 0, totalDur = 0, allLegs = [];
     for (let i = 0; i < waypoints.length - 1; i += 20) {
       const chunk = waypoints.slice(i, i + 21);
       if (chunk.length < 2) break;
@@ -938,9 +946,10 @@ async function fetchRouteWithStats(waypoints) {
         allCoords.push(...r.coords);
         totalDist += r.distance;
         totalDur += r.duration;
+        allLegs.push(...(r.legs || []));
       }
     }
-    return { coords: allCoords, distance: totalDist, duration: totalDur };
+    return { coords: allCoords, distance: totalDist, duration: totalDur, legs: allLegs };
   }
   return await fetchSingleRouteWithStats(waypoints);
 }
@@ -973,23 +982,96 @@ function updateEditorStats() {
   document.getElementById('statDist').textContent = km + ' km';
   document.getElementById('statTime').textContent = h + 'h ' + m + 'm';
   document.getElementById('statPts').textContent = n;
+  // elevation summary
+  const elevEl = document.getElementById('statElev');
+  const elev = rtEditor.elevations;
+  if (elev.length >= 2) {
+    let gain = 0, loss = 0;
+    for (let i = 1; i < elev.length; i++) {
+      const diff = elev[i] - elev[i - 1];
+      if (diff > 0) gain += diff; else loss += Math.abs(diff);
+    }
+    elevEl.innerHTML = '累計爬升：<strong style="color:#c62828;">+' + Math.round(gain) + 'm</strong>　下降：<strong style="color:#1565c0;">-' + Math.round(loss) + 'm</strong>';
+  } else {
+    elevEl.innerHTML = '';
+  }
+}
+
+async function fetchElevations() {
+  clearTimeout(rtEditor.elevDebounce);
+  rtEditor.elevDebounce = setTimeout(async () => {
+    const pts = rtEditor.waypoints.map(w => {
+      const ll = w.marker.getLatLng();
+      return { latitude: ll.lat, longitude: ll.lng };
+    });
+    if (pts.length === 0) { rtEditor.elevations = []; return; }
+    try {
+      const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations: pts })
+      });
+      const data = await res.json();
+      if (data.results) {
+        rtEditor.elevations = data.results.map(r => r.elevation);
+        updateEditorStats();
+        updateWpList();
+      }
+    } catch (e) {
+      // fallback: try opentopodata
+      try {
+        const locs = pts.map(p => p.latitude + ',' + p.longitude).join('|');
+        const res2 = await fetch('https://api.opentopodata.org/v1/srtm30m?locations=' + encodeURIComponent(locs));
+        const data2 = await res2.json();
+        if (data2.results) {
+          rtEditor.elevations = data2.results.map(r => r.elevation || 0);
+          updateEditorStats();
+          updateWpList();
+        }
+      } catch (e2) {
+        rtEditor.elevations = [];
+      }
+    }
+  }, 600);
 }
 
 function updateWpList() {
   const el = document.getElementById('wpList');
-  el.innerHTML = rtEditor.waypoints.map((wp, i) => {
+  const legs = rtEditor.legs;
+  const elev = rtEditor.elevations;
+  let html = '';
+  rtEditor.waypoints.forEach((wp, i) => {
     const ll = wp.marker.getLatLng();
     let label = wp.name || '';
     if (!label) {
       const near = findNearestTemple(ll.lat, ll.lng);
       label = near ? near.n + '番 ' + near.name + ' 附近' : '';
     }
-    return `<div class="rt-wp-item">
+    const elevTxt = elev[i] != null ? elev[i] + 'm' : '';
+    html += `<div class="rt-wp-item" style="flex-wrap:wrap;">
       <span class="rt-wp-num">${i + 1}</span>
-      <span>${label} <span style="color:#aaa;font-size:11px;">(${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)})</span></span>
+      <span style="flex:1;">${label}${elevTxt ? ' <span style="color:#888;font-size:11px;">⛰ ' + elevTxt + '</span>' : ''}</span>
       <button class="rt-wp-del" onclick="removeWaypoint(${i})">✕</button>
     </div>`;
-  }).join('');
+    // segment info between this and next waypoint
+    if (i < rtEditor.waypoints.length - 1 && legs[i]) {
+      const segKm = (legs[i].distance / 1000).toFixed(1);
+      const segH = Math.floor(legs[i].duration / 3600);
+      const segM = Math.round((legs[i].duration % 3600) / 60);
+      const timeTxt = segH > 0 ? segH + 'h ' + segM + 'm' : segM + 'm';
+      let elevDiffHtml = '';
+      if (elev[i] != null && elev[i + 1] != null) {
+        const diff = elev[i + 1] - elev[i];
+        const arrow = diff >= 0 ? '↑' : '↓';
+        const color = diff >= 0 ? '#c62828' : '#1565c0';
+        elevDiffHtml = `<span style="color:${color};"> ${arrow}${Math.abs(Math.round(diff))}m</span>`;
+      }
+      html += `<div style="padding:2px 0 2px 28px;font-size:11px;color:#888;border-left:2px dashed #ddd;margin-left:10px;">
+        ↕ ${segKm} km ・ ${timeTxt}${elevDiffHtml}
+      </div>`;
+    }
+  });
+  el.innerHTML = html;
 }
 
 function saveEditorState() {
@@ -1107,21 +1189,49 @@ async function generatePlanRoute() {
     if (result) {
       L.polyline(result.coords, { color: '#6a1b9a', weight: 4, opacity: 0.85 }).addTo(planRoute.layer);
 
-      // calculate per-segment distances using legs
+      // fetch elevations for all waypoints
+      let elevs = [];
+      try {
+        const locs = waypoints.map(p => ({ latitude: p[0], longitude: p[1] }));
+        const elevRes = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ locations: locs })
+        });
+        const elevData = await elevRes.json();
+        if (elevData.results) elevs = elevData.results.map(r => r.elevation);
+      } catch (ee) {}
+
       let html = '<div class="rt-stats" style="margin-top:10px;"><strong>每日分段</strong></div>';
       const totalKm = (result.distance / 1000).toFixed(1);
       const totalH = Math.floor(result.duration / 3600);
       const totalM = Math.round((result.duration % 3600) / 60);
-      html += `<div class="rt-stats">總距離：<strong>${totalKm} km</strong>　預估：<strong>${totalH}h ${totalM}m</strong></div>`;
+      let totalGain = 0, totalLoss = 0;
+      if (elevs.length >= 2) {
+        for (let i = 1; i < elevs.length; i++) {
+          const d = elevs[i] - elevs[i - 1];
+          if (d > 0) totalGain += d; else totalLoss += Math.abs(d);
+        }
+      }
+      const elevSummary = elevs.length >= 2 ? `<br>累計爬升：<strong style="color:#c62828;">+${Math.round(totalGain)}m</strong>　下降：<strong style="color:#1565c0;">-${Math.round(totalLoss)}m</strong>` : '';
+      html += `<div class="rt-stats">總距離：<strong>${totalKm} km</strong>　預估：<strong>${totalH}h ${totalM}m</strong>${elevSummary}</div>`;
 
       if (result.legs && result.legs.length > 0) {
         segments.forEach(seg => {
-          let segDist = 0;
+          let segDist = 0, segDur = 0, segGain = 0, segLoss = 0;
           for (let li = Math.max(0, seg.wpStart); li < Math.min(seg.wpEnd - 1, result.legs.length); li++) {
             segDist += result.legs[li].distance;
+            segDur += result.legs[li].duration;
+            if (elevs[li] != null && elevs[li + 1] != null) {
+              const d = elevs[li + 1] - elevs[li];
+              if (d > 0) segGain += d; else segLoss += Math.abs(d);
+            }
           }
           const km = (segDist / 1000).toFixed(1);
-          html += `<div class="rt-day-segment">Day ${seg.day}：<strong>${km} km</strong>（${seg.startName} → ${seg.endName}）</div>`;
+          const sh = Math.floor(segDur / 3600);
+          const sm = Math.round((segDur % 3600) / 60);
+          const timeTxt = sh > 0 ? sh + 'h ' + sm + 'm' : sm + 'm';
+          const elevTxt = (segGain || segLoss) ? ` <span style="color:#c62828;">↑${Math.round(segGain)}m</span> <span style="color:#1565c0;">↓${Math.round(segLoss)}m</span>` : '';
+          html += `<div class="rt-day-segment">Day ${seg.day}：<strong>${km} km</strong> ・ ${timeTxt}${elevTxt}<br><span style="font-size:11px;color:#888;">${seg.startName} → ${seg.endName}</span></div>`;
         });
       }
       document.getElementById('planStats').innerHTML = html;
