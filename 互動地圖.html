@@ -81,6 +81,7 @@
   <div id="infoPanelContent"></div>
 </div>
 
+<script src="min88_data.js"></script>
 <script>
 // ===== MAP INIT =====
 const map = L.map('map', { zoomControl: true }).setView([33.85, 134.0], 9);
@@ -259,12 +260,15 @@ const layerJCHotels = L.layerGroup();
 const layerVocusHotels = L.layerGroup();
 const layerDiary46Hotels = L.layerGroup();
 const layerHikingNoteHotels = L.layerGroup();
+const layerMin88 = L.layerGroup();
 const layerPois = L.layerGroup();
 const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
 const layerRouteJC = L.layerGroup();
 
-// Add default visible layers
+const min88Icon = makeIcon('#009688', 8);
+
+// Add default visible layers (min88 OFF by default - too many markers)
 [layerTemples, layerJCHotels, layerPois, layerRouteTokushima, layerRouteKochi].forEach(l => l.addTo(map));
 
 // ===== LAYER CONTROL =====
@@ -276,6 +280,7 @@ const overlays = {
   '🟣 vocus 38間住宿（2025）': layerVocusHotels,
   '🟤 46天遊記住宿（2009）': layerDiary46Hotels,
   '🩷 健行筆記住宿（2019）': layerHikingNoteHotels,
+  '🏠 min88 全住宿（142間）': layerMin88,
   '🟡 景點 / 注意點': layerPois,
   '🩵 Jesse&Carrie 實際路線': layerRouteJC
 };
@@ -468,7 +473,8 @@ function filterByDay(day) {
     ...layerVocusHotels.getLayers(),
     ...layerDiary46Hotels.getLayers(),
     ...layerHikingNoteHotels.getLayers(),
-    ...layerPois.getLayers()
+    ...layerPois.getLayers(),
+    ...layerMin88.getLayers()
   ];
 
   allItems.forEach(m => {
@@ -513,7 +519,32 @@ function showDayInfo(day) {
   document.getElementById('infoPanel').style.display = 'block';
 }
 
+// ===== DRAW MIN88 =====
+function drawMin88() {
+  if (typeof min88Inns === 'undefined') return;
+  min88Inns.forEach(inn => {
+    const gmapUrl = `https://www.google.com/maps?q=${inn.lat},${inn.lng}`;
+    const imgHtml = inn.img && !inn.img.includes('noimage')
+      ? `<img src="${inn.img}" style="width:100%;max-height:100px;object-fit:cover;border-radius:4px;margin-bottom:6px;" onerror="this.style.display='none'">`
+      : '';
+    const telHtml = inn.tel ? `<div style="font-size:11px;">TEL: <a href="tel:${inn.tel}">${inn.tel}</a></div>` : '';
+    const m = L.marker([inn.lat, inn.lng], {icon: min88Icon}).bindPopup(`
+      <div class="popup-content" style="min-width:200px;">
+        ${imgHtml}
+        <h3>${inn.name}</h3>
+        <div class="meta">
+          <a href="${inn.url}" target="_blank">min88 詳細</a>｜<a href="${gmapUrl}" target="_blank">Google Map</a>
+        </div>
+        ${telHtml}
+      </div>
+    `, {maxWidth: 280});
+    m._data = {day: 0};
+    layerMin88.addLayer(m);
+  });
+}
+
 // ===== INIT =====
+drawMin88();
 drawTemples();
 drawHotels(jcHotels, layerJCHotels, hotelIcon, '');
 drawHotels(vocusHotels, layerVocusHotels, vocusIcon, '【vocus】');
