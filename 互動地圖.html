@@ -316,10 +316,11 @@ function drawTemples() {
     const icon = t.warn ? makeNumIcon('#c62828', t.n) : makeNumIcon('#e74c3c', t.n);
     const warnHtml = t.warn ? `<br><span style="color:#c62828;font-weight:bold">${t.warn}</span>` : '';
     const epUrl = videoUrls[t.ep] || '#';
+    const gmapUrl = `https://www.google.com/maps?q=${t.lat},${t.lng}`;
     const m = L.marker([t.lat, t.lng], {icon}).bindPopup(`
       <div class="popup-content">
         <h3>${t.n}番 ${t.name}</h3>
-        <div class="meta">Day${t.day}｜<a href="${epUrl}" target="_blank">ep.${t.ep} 影片</a></div>
+        <div class="meta">Day${t.day}｜<a href="${epUrl}" target="_blank">ep.${t.ep} 影片</a>｜<a href="${gmapUrl}" target="_blank">Google Map</a></div>
         ${warnHtml}
       </div>
     `);
@@ -335,11 +336,12 @@ function drawHotels(list, layer, icon, prefix) {
     const imgHtml = h.img ? `<img src="${h.img}" style="width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:6px;" onerror="this.style.display='none'">` : '';
     const addrHtml = h.addr ? `<div style="font-size:11px;color:#666;">${h.addr}</div>` : '';
     const telHtml = h.tel ? `<div style="font-size:11px;color:#666;">TEL: <a href="tel:${h.tel}">${h.tel}</a></div>` : '';
+    const gmapUrl = `https://www.google.com/maps?q=${h.lat},${h.lng}`;
     const m = L.marker([h.lat, h.lng], {icon}).bindPopup(`
       <div class="popup-content" style="min-width:220px;">
         ${imgHtml}
         <h3>${prefix}${h.name}</h3>
-        <div class="meta">Day${h.day}｜<a href="${epUrl}" target="_blank">ep.${h.ep} 影片</a>${urlHtml}</div>
+        <div class="meta">Day${h.day}｜<a href="${epUrl}" target="_blank">ep.${h.ep}</a>${urlHtml}｜<a href="${gmapUrl}" target="_blank">Google Map</a></div>
         ${addrHtml}${telHtml}
         <div style="margin-top:4px;">${h.note}</div>
       </div>
@@ -352,10 +354,11 @@ function drawHotels(list, layer, icon, prefix) {
 function drawPois() {
   pois.forEach(p => {
     const epUrl = videoUrls[p.ep] || '#';
+    const gmapUrl = `https://www.google.com/maps?q=${p.lat},${p.lng}`;
     const m = L.marker([p.lat, p.lng], {icon: poiIcon}).bindPopup(`
       <div class="popup-content">
         <h3>${p.name}</h3>
-        <div class="meta">Day${p.day}｜<a href="${epUrl}" target="_blank">ep.${p.ep} 影片</a></div>
+        <div class="meta">Day${p.day}｜<a href="${epUrl}" target="_blank">ep.${p.ep}</a>｜<a href="${gmapUrl}" target="_blank">Google Map</a></div>
         <div>${p.note}</div>
       </div>
     `);
