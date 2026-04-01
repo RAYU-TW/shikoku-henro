@@ -289,6 +289,9 @@
         <button class="rt-btn rt-btn-secondary" style="font-size:12px;" onclick="document.getElementById('itnImportFile').click()">匯入</button>
         <input type="file" id="itnImportFile" accept=".json" style="display:none" onchange="itnImportJson(event)">
       </div>
+      <div class="itn-actions">
+        <button class="rt-btn rt-btn-secondary" style="font-size:12px;color:#c62828;border-color:#c62828;" onclick="itnClearAll()">清除全部行程</button>
+      </div>
       <div id="itnSavedList" class="itn-save-list"></div>
     </div>
     <!-- Tab C: GPX -->
@@ -1860,6 +1863,15 @@ function itnLoadPreset(src) {
   itn.days = days;
   document.getElementById('itnDays').value = days.length;
   document.getElementById('itnStartDate').value = days[0].fullDate;
+  itnRender();
+  itnSaveAuto();
+}
+
+function itnClearAll() {
+  if (!confirm('確定清除全部行程？（已儲存的行程不受影響）')) return;
+  itn.days.forEach(d => { d.stops = []; d.legs = []; d.elevs = []; d._routeCoords = null; });
+  itn.routeLayer.clearLayers();
+  itn.markerLayer.clearLayers();
   itnRender();
   itnSaveAuto();
 }
