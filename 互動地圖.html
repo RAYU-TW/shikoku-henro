@@ -269,6 +269,15 @@
         <input type="number" id="itnDays" value="14" min="1" max="60" style="width:50px;">
         <button class="rt-btn rt-btn-primary" style="width:auto;padding:5px 10px;font-size:12px;" onclick="itnBuildDays()">套用</button>
       </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:6px;">載入參考行程：</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          <button class="rt-btn rt-btn-secondary" style="width:auto;padding:4px 8px;font-size:11px;border-left:3px solid #2196f3;" onclick="itnLoadPreset('jc')">Jesse&Carrie</button>
+          <button class="rt-btn rt-btn-secondary" style="width:auto;padding:4px 8px;font-size:11px;border-left:3px solid #7b1fa2;" onclick="itnLoadPreset('vocus')">vocus 2025</button>
+          <button class="rt-btn rt-btn-secondary" style="width:auto;padding:4px 8px;font-size:11px;border-left:3px solid #795548;" onclick="itnLoadPreset('d46')">46天遊記</button>
+          <button class="rt-btn rt-btn-secondary" style="width:auto;padding:4px 8px;font-size:11px;border-left:3px solid #e91e63;" onclick="itnLoadPreset('hk')">健行筆記</button>
+        </div>
+      </div>
       <div id="itnDayList"></div>
       <div class="itn-actions">
         <button class="rt-btn rt-btn-primary" style="font-size:12px;" onclick="itnCalcAllRoutes()">計算全部路線</button>
@@ -1734,6 +1743,56 @@ function itnRenderSavedList() {
     </div>`;
   });
   el.innerHTML = html;
+}
+
+function itnLoadPreset(src) {
+  // Build itinerary from existing hotel/temple data
+  let hotels, startDate, label;
+  if (src === 'jc') {
+    hotels = jcHotels; startDate = '2023-04-10'; label = 'Jesse&Carrie 2023';
+  } else if (src === 'vocus') {
+    hotels = vocusHotels; startDate = '2025-04-10'; label = 'vocus 2025';
+  } else if (src === 'd46') {
+    hotels = diary46Hotels; startDate = '2009-04-07'; label = '46天遊記 2009';
+  } else if (src === 'hk') {
+    hotels = hikingNoteHotels; startDate = '2019-04-01'; label = '健行筆記 2019';
+  } else return;
+
+  // find max day
+  const maxDay = Math.max(...hotels.map(h => h.day), ...temples.map(t => t.day));
+  const base = new Date(startDate);
+
+  const days = [];
+  for (let d = 1; d <= maxDay; d++) {
+    const dt = new Date(base);
+    dt.setDate(dt.getDate() + (d - 1));
+    const dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
+
+    // temples for this day
+    const dayTemples = temples.filter(t => t.day === d);
+    // hotels for this day
+    const dayHotels = hotels.filter(h => h.day === d);
+
+    const stops = [];
+    dayTemples.forEach(t => stops.push({ lat: t.lat, lng: t.lng, name: t.n + '番 ' + t.name }));
+    dayHotels.forEach(h => stops.push({ lat: h.lat, lng: h.lng, name: '🏨 ' + h.name }));
+
+    days.push({
+      date: dateStr,
+      fullDate: dt.toISOString().slice(0, 10),
+      stops,
+      legs: [],
+      elevs: [],
+      _collapsed: stops.length === 0,
+      _routeCoords: null
+    });
+  }
+
+  itn.days = days;
+  document.getElementById('itnDays').value = days.length;
+  document.getElementById('itnStartDate').value = days[0].fullDate;
+  itnRender();
+  itnSaveAuto();
 }
 
 function itnExportJson() {
