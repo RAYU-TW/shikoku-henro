@@ -815,6 +815,38 @@ function findNearestTemple(lat, lng) {
   return { n: best.n, name: best.name, day: best.day, dist: `~${km}km` };
 }
 
+// ===== HIKING TIME CALCULATOR =====
+// Naismith's Rule with Tranter's correction for loaded hiking:
+// Base: 3.5 km/h (遍路者背包約7-8kg的合理速度)
+// Ascent: +1 hr per 500m elevation gain
+// Descent: +1 hr per 800m elevation loss (steep descent is slower)
+const HIKE_SPEED_KMH = 3.5;  // base speed (km/h) on flat terrain
+
+function calcHikingTime(distMeters, elevGain, elevLoss) {
+  const distKm = distMeters / 1000;
+  const baseSeconds = (distKm / HIKE_SPEED_KMH) * 3600;
+  const ascentSeconds = (elevGain / 500) * 3600;
+  const descentSeconds = (elevLoss / 800) * 3600;
+  return Math.round(baseSeconds + ascentSeconds + descentSeconds);
+}
+
+// Calculate hiking time for a single leg given distance and two elevations
+function calcLegHikingTime(distMeters, elevStart, elevEnd) {
+  if (elevStart == null || elevEnd == null) {
+    return Math.round((distMeters / 1000 / HIKE_SPEED_KMH) * 3600);
+  }
+  const diff = elevEnd - elevStart;
+  const gain = diff > 0 ? diff : 0;
+  const loss = diff < 0 ? Math.abs(diff) : 0;
+  return calcHikingTime(distMeters, gain, loss);
+}
+
+function formatHikeTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+}
+
 // ===== DRAW MIN88 =====
 function drawMin88() {
   if (typeof min88Inns === 'undefined') return;
@@ -1143,20 +1175,20 @@ function updateEditorStats() {
   if (n === 0) { statsEl.style.display = 'none'; return; }
   statsEl.style.display = '';
   const km = (rtEditor.totalDist / 1000).toFixed(1);
-  const h = Math.floor(rtEditor.totalTime / 3600);
-  const m = Math.round((rtEditor.totalTime % 3600) / 60);
-  document.getElementById('statDist').textContent = km + ' km';
-  document.getElementById('statTime').textContent = h + 'h ' + m + 'm';
-  document.getElementById('statPts').textContent = n;
-  // elevation summary
-  const elevEl = document.getElementById('statElev');
   const elev = rtEditor.elevations;
+  let gain = 0, loss = 0;
   if (elev.length >= 2) {
-    let gain = 0, loss = 0;
     for (let i = 1; i < elev.length; i++) {
       const diff = elev[i] - elev[i - 1];
       if (diff > 0) gain += diff; else loss += Math.abs(diff);
     }
+  }
+  const hikeTime = calcHikingTime(rtEditor.totalDist, gain, loss);
+  document.getElementById('statDist').textContent = km + ' km';
+  document.getElementById('statTime').textContent = formatHikeTime(hikeTime);
+  document.getElementById('statPts').textContent = n;
+  const elevEl = document.getElementById('statElev');
+  if (elev.length >= 2) {
     elevEl.innerHTML = '累計爬升：<strong style="color:#c62828;">+' + Math.round(gain) + 'm</strong>　下降：<strong style="color:#1565c0;">-' + Math.round(loss) + 'm</strong>';
   } else {
     elevEl.innerHTML = '';
@@ -1222,9 +1254,8 @@ function updateWpList() {
     // segment info between this and next waypoint
     if (i < rtEditor.waypoints.length - 1 && legs[i]) {
       const segKm = (legs[i].distance / 1000).toFixed(1);
-      const segH = Math.floor(legs[i].duration / 3600);
-      const segM = Math.round((legs[i].duration % 3600) / 60);
-      const timeTxt = segH > 0 ? segH + 'h ' + segM + 'm' : segM + 'm';
+      const segTime = calcLegHikingTime(legs[i].distance, elev[i], elev[i + 1]);
+      const timeTxt = formatHikeTime(segTime);
       let elevDiffHtml = '';
       if (elev[i] != null && elev[i + 1] != null) {
         const diff = elev[i + 1] - elev[i];
@@ -1369,8 +1400,6 @@ async function generatePlanRoute() {
 
       let html = '<div class="rt-stats" style="margin-top:10px;"><strong>每日分段</strong></div>';
       const totalKm = (result.distance / 1000).toFixed(1);
-      const totalH = Math.floor(result.duration / 3600);
-      const totalM = Math.round((result.duration % 3600) / 60);
       let totalGain = 0, totalLoss = 0;
       if (elevs.length >= 2) {
         for (let i = 1; i < elevs.length; i++) {
@@ -1378,24 +1407,22 @@ async function generatePlanRoute() {
           if (d > 0) totalGain += d; else totalLoss += Math.abs(d);
         }
       }
+      const totalHikeTime = calcHikingTime(result.distance, totalGain, totalLoss);
       const elevSummary = elevs.length >= 2 ? `<br>累計爬升：<strong style="color:#c62828;">+${Math.round(totalGain)}m</strong>　下降：<strong style="color:#1565c0;">-${Math.round(totalLoss)}m</strong>` : '';
-      html += `<div class="rt-stats">總距離：<strong>${totalKm} km</strong>　預估：<strong>${totalH}h ${totalM}m</strong>${elevSummary}</div>`;
+      html += `<div class="rt-stats">總距離：<strong>${totalKm} km</strong>　預估步行：<strong>${formatHikeTime(totalHikeTime)}</strong>${elevSummary}</div>`;
 
       if (result.legs && result.legs.length > 0) {
         segments.forEach(seg => {
-          let segDist = 0, segDur = 0, segGain = 0, segLoss = 0;
+          let segDist = 0, segGain = 0, segLoss = 0;
           for (let li = Math.max(0, seg.wpStart); li < Math.min(seg.wpEnd - 1, result.legs.length); li++) {
             segDist += result.legs[li].distance;
-            segDur += result.legs[li].duration;
             if (elevs[li] != null && elevs[li + 1] != null) {
               const d = elevs[li + 1] - elevs[li];
               if (d > 0) segGain += d; else segLoss += Math.abs(d);
             }
           }
           const km = (segDist / 1000).toFixed(1);
-          const sh = Math.floor(segDur / 3600);
-          const sm = Math.round((segDur % 3600) / 60);
-          const timeTxt = sh > 0 ? sh + 'h ' + sm + 'm' : sm + 'm';
+          const timeTxt = formatHikeTime(calcHikingTime(segDist, segGain, segLoss));
           const elevTxt = (segGain || segLoss) ? ` <span style="color:#c62828;">↑${Math.round(segGain)}m</span> <span style="color:#1565c0;">↓${Math.round(segLoss)}m</span>` : '';
           html += `<div class="rt-day-segment">Day ${seg.day}：<strong>${km} km</strong> ・ ${timeTxt}${elevTxt}<br><span style="font-size:11px;color:#888;">${seg.startName} → ${seg.endName}</span></div>`;
         });
@@ -1448,8 +1475,8 @@ function itnRender() {
     const color = DAY_COLORS[di % DAY_COLORS.length];
     const isAdding = itn.addingToDay === di;
     // calc day stats
-    let totalDist = 0, totalDur = 0;
-    (day.legs || []).forEach(l => { totalDist += l.dist || 0; totalDur += l.dur || 0; });
+    let totalDist = 0;
+    (day.legs || []).forEach(l => { totalDist += l.dist || 0; });
     let elevGain = 0, elevLoss = 0;
     if (day.elevs && day.elevs.length >= 2) {
       for (let e = 1; e < day.elevs.length; e++) {
@@ -1458,10 +1485,9 @@ function itnRender() {
       }
     }
     const km = (totalDist / 1000).toFixed(1);
-    const h = Math.floor(totalDur / 3600);
-    const m = Math.round((totalDur % 3600) / 60);
+    const hikeTime = calcHikingTime(totalDist, elevGain, elevLoss);
     const statsHtml = day.stops.length >= 2
-      ? `<span class="itn-day-stats">${km}km ・ ${h}h${m}m${elevGain ? ' ↑' + Math.round(elevGain) + 'm' : ''}${elevLoss ? ' ↓' + Math.round(elevLoss) + 'm' : ''}</span>`
+      ? `<span class="itn-day-stats">${km}km ・ ${formatHikeTime(hikeTime)}${elevGain ? ' ↑' + Math.round(elevGain) + 'm' : ''}${elevLoss ? ' ↓' + Math.round(elevLoss) + 'm' : ''}</span>`
       : `<span class="itn-day-stats">${day.stops.length} 站</span>`;
 
     html += `<div class="itn-day">
@@ -1481,14 +1507,13 @@ function itnRender() {
       // segment info
       if (si < day.stops.length - 1 && day.legs && day.legs[si]) {
         const lk = (day.legs[si].dist / 1000).toFixed(1);
-        const lh = Math.floor(day.legs[si].dur / 3600);
-        const lm = Math.round((day.legs[si].dur % 3600) / 60);
+        const legTime = calcLegHikingTime(day.legs[si].dist, day.elevs ? day.elevs[si] : null, day.elevs ? day.elevs[si + 1] : null);
         let ediff = '';
         if (day.elevs && day.elevs[si] != null && day.elevs[si + 1] != null) {
           const d = day.elevs[si + 1] - day.elevs[si];
           ediff = d >= 0 ? ` <span style="color:#c62828;">↑${Math.abs(Math.round(d))}m</span>` : ` <span style="color:#1565c0;">↓${Math.abs(Math.round(d))}m</span>`;
         }
-        html += `<div class="itn-seg">↕ ${lk}km ・ ${lh > 0 ? lh + 'h' : ''}${lm}m${ediff}</div>`;
+        html += `<div class="itn-seg">↕ ${lk}km ・ ${formatHikeTime(legTime)}${ediff}</div>`;
       }
     });
 
