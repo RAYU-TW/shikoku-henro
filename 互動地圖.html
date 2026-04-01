@@ -725,7 +725,7 @@ function drawShops() {
         ${brandHtml}${nearHtml}
       </div>
     `);
-    m._data = { day: nearestTemple ? nearestTemple.day : 0 };
+    m._data = { day: nearestTemple ? nearestTemple.day : 0, name: s.name };
     layer.addLayer(m);
   });
 }
@@ -802,12 +802,41 @@ function toggleEditMode() {
     btn.classList.add('editing');
     map.getContainer().style.cursor = 'crosshair';
     map.on('click', onMapAddWp);
+    map.on('popupopen', onPopupOpenInEdit);
   } else {
     btn.textContent = '開始編輯';
     btn.classList.remove('editing');
     map.getContainer().style.cursor = '';
     map.off('click', onMapAddWp);
+    map.off('popupopen', onPopupOpenInEdit);
   }
+}
+
+function onPopupOpenInEdit(e) {
+  const marker = e.popup._source;
+  if (!marker || !marker._data) return;
+  // skip waypoint markers from the editor itself
+  if (rtEditor.waypoints.some(w => w.marker === marker)) return;
+  const container = e.popup.getElement();
+  if (!container) return;
+  // avoid adding button twice
+  if (container.querySelector('.rt-add-wp-btn')) return;
+  const ll = marker.getLatLng();
+  const d = marker._data;
+  const name = d.n ? (d.n + '番 ' + (d.name || '')) : (d.name || '');
+  const btn = document.createElement('button');
+  btn.className = 'rt-add-wp-btn';
+  btn.textContent = '＋ 加入途經點' + (name ? '（' + name + '）' : '');
+  btn.style.cssText = 'display:block;width:100%;margin-top:8px;padding:6px;background:#1976d2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;';
+  btn.onmouseover = () => btn.style.background = '#1565c0';
+  btn.onmouseout = () => btn.style.background = '#1976d2';
+  btn.onclick = (ev) => {
+    ev.stopPropagation();
+    addWaypoint(ll.lat, ll.lng, name);
+    marker.closePopup();
+  };
+  const content = container.querySelector('.leaflet-popup-content');
+  if (content) content.appendChild(btn);
 }
 document.getElementById('btnToggleEdit').onclick = toggleEditMode;
 
@@ -815,14 +844,14 @@ function onMapAddWp(e) {
   addWaypoint(e.latlng.lat, e.latlng.lng);
 }
 
-function addWaypoint(lat, lng) {
+function addWaypoint(lat, lng, name) {
   const idx = rtEditor.waypoints.length;
   const icon = makeNumIcon('#1976d2', idx + 1);
   const m = L.marker([lat, lng], { icon, draggable: true });
   m.bindPopup(`<button onclick="removeWaypointByMarker(this)" style="padding:4px 10px;cursor:pointer;">刪除此途經點</button>`);
   m.on('dragend', () => { recalcRoute(); });
   rtEditor.markerLayer.addLayer(m);
-  rtEditor.waypoints.push({ lat, lng, marker: m });
+  rtEditor.waypoints.push({ lat, lng, marker: m, name: name || '' });
   recalcRoute();
 }
 
@@ -949,25 +978,32 @@ function updateEditorStats() {
 function updateWpList() {
   const el = document.getElementById('wpList');
   el.innerHTML = rtEditor.waypoints.map((wp, i) => {
-    const near = findNearestTemple(wp.marker.getLatLng().lat, wp.marker.getLatLng().lng);
-    const nearTxt = near ? near.n + '番' + near.name : '';
+    const ll = wp.marker.getLatLng();
+    let label = wp.name || '';
+    if (!label) {
+      const near = findNearestTemple(ll.lat, ll.lng);
+      label = near ? near.n + '番 ' + near.name + ' 附近' : '';
+    }
     return `<div class="rt-wp-item">
       <span class="rt-wp-num">${i + 1}</span>
-      <span>${nearTxt} <span style="color:#aaa;font-size:11px;">(${wp.marker.getLatLng().lat.toFixed(4)}, ${wp.marker.getLatLng().lng.toFixed(4)})</span></span>
+      <span>${label} <span style="color:#aaa;font-size:11px;">(${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)})</span></span>
       <button class="rt-wp-del" onclick="removeWaypoint(${i})">✕</button>
     </div>`;
   }).join('');
 }
 
 function saveEditorState() {
-  const data = rtEditor.waypoints.map(w => [w.marker.getLatLng().lat, w.marker.getLatLng().lng]);
+  const data = rtEditor.waypoints.map(w => {
+    const ll = w.marker.getLatLng();
+    return [ll.lat, ll.lng, w.name || ''];
+  });
   localStorage.setItem('henro_wp', JSON.stringify(data));
 }
 
 function loadEditorState() {
   try {
     const data = JSON.parse(localStorage.getItem('henro_wp'));
-    if (data && data.length) data.forEach(p => addWaypoint(p[0], p[1]));
+    if (data && data.length) data.forEach(p => addWaypoint(p[0], p[1], p[2] || ''));
   } catch (e) {}
 }
 
