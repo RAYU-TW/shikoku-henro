@@ -184,6 +184,13 @@
     <div class="rt-panel active" id="panelEditor">
       <p class="rt-desc">點擊「開始編輯」後，在地圖上點擊新增途經點。<br>拖曳可移動位置，點擊 ✕ 可刪除。</p>
       <button class="rt-btn rt-btn-primary" id="btnToggleEdit">開始編輯</button>
+      <div style="margin-top:10px;">
+        <div style="display:flex;gap:4px;">
+          <input type="text" id="gmapUrlInput" placeholder="貼上 Google Map 網址或座標" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:inherit;">
+          <button class="rt-btn rt-btn-primary" style="width:auto;padding:6px 12px;font-size:12px;" onclick="addFromGmapUrl()">加入</button>
+        </div>
+        <div id="gmapUrlMsg" style="font-size:11px;margin-top:4px;"></div>
+      </div>
       <div class="rt-stats" id="editorStats" style="display:none;">
         距離：<strong id="statDist">0 km</strong><br>
         預估時間：<strong id="statTime">0h 0m</strong><br>
@@ -843,6 +850,99 @@ function onPopupOpenInEdit(e) {
   if (content) content.appendChild(btn);
 }
 document.getElementById('btnToggleEdit').onclick = toggleEditMode;
+
+// Google Maps URL parser
+function addFromGmapUrl() {
+  const input = document.getElementById('gmapUrlInput');
+  const msg = document.getElementById('gmapUrlMsg');
+  const raw = input.value.trim();
+  if (!raw) return;
+
+  const result = parseGmapInput(raw);
+  if (!result) {
+    msg.innerHTML = '<span style="color:#c62828;">無法解析，請貼上 Google Map 地點網址或座標</span>';
+    return;
+  }
+
+  addWaypoint(result.lat, result.lng, result.name);
+  msg.innerHTML = `<span style="color:#2e7d32;">已加入：${result.name || result.lat.toFixed(5) + ', ' + result.lng.toFixed(5)}</span>`;
+  input.value = '';
+  // fly to the point
+  map.flyTo([result.lat, result.lng], 15, { duration: 0.8 });
+}
+
+function parseGmapInput(raw) {
+  let lat, lng, name = '';
+
+  // 1. Direct coordinates: "34.159, 134.502" or "34.159 134.502"
+  const coordMatch = raw.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if (coordMatch) {
+    lat = parseFloat(coordMatch[1]);
+    lng = parseFloat(coordMatch[2]);
+    if (isValidLatLng(lat, lng)) return { lat, lng, name };
+  }
+
+  // 2. Google Maps place URL: /place/PLACE_NAME/@LAT,LNG
+  const placeMatch = raw.match(/\/place\/([^/@]+)\/@(-?\d+\.?\d+),(-?\d+\.?\d+)/);
+  if (placeMatch) {
+    name = decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ');
+    lat = parseFloat(placeMatch[2]);
+    lng = parseFloat(placeMatch[3]);
+    if (isValidLatLng(lat, lng)) return { lat, lng, name };
+  }
+
+  // 3. Google Maps @LAT,LNG in URL (without /place/)
+  const atMatch = raw.match(/@(-?\d+\.?\d+),(-?\d+\.?\d+)/);
+  if (atMatch) {
+    lat = parseFloat(atMatch[1]);
+    lng = parseFloat(atMatch[2]);
+    if (isValidLatLng(lat, lng)) {
+      // try to extract name from /place/ or /search/ prefix
+      const nameMatch = raw.match(/\/(?:place|search)\/([^/@]+)/);
+      if (nameMatch) name = decodeURIComponent(nameMatch[1]).replace(/\+/g, ' ');
+      return { lat, lng, name };
+    }
+  }
+
+  // 4. ?q=LAT,LNG or &ll=LAT,LNG
+  const qMatch = raw.match(/[?&](?:q|ll|query)=(-?\d+\.?\d+),(-?\d+\.?\d+)/);
+  if (qMatch) {
+    lat = parseFloat(qMatch[1]);
+    lng = parseFloat(qMatch[2]);
+    if (isValidLatLng(lat, lng)) return { lat, lng, name };
+  }
+
+  // 5. ?q=PLACE_NAME (search query without coords) — extract from data= or other params
+  const dataMatch = raw.match(/!3d(-?\d+\.?\d+)!4d(-?\d+\.?\d+)/);
+  if (dataMatch) {
+    lat = parseFloat(dataMatch[1]);
+    lng = parseFloat(dataMatch[2]);
+    if (isValidLatLng(lat, lng)) {
+      const qName = raw.match(/[?&]q=([^&]+)/);
+      if (qName) name = decodeURIComponent(qName[1]).replace(/\+/g, ' ');
+      return { lat, lng, name };
+    }
+  }
+
+  // 6. Shortened ftid/CID style — extract any coords in URL
+  const anyCoord = raw.match(/(-?\d{1,3}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/);
+  if (anyCoord) {
+    lat = parseFloat(anyCoord[1]);
+    lng = parseFloat(anyCoord[2]);
+    if (isValidLatLng(lat, lng)) return { lat, lng, name };
+  }
+
+  return null;
+}
+
+function isValidLatLng(lat, lng) {
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !isNaN(lat) && !isNaN(lng);
+}
+
+// Allow Enter key to submit
+document.getElementById('gmapUrlInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); addFromGmapUrl(); }
+});
 
 function onMapAddWp(e) {
   addWaypoint(e.latlng.lat, e.latlng.lng);
