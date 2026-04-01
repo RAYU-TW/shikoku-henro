@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>四國遍路互動地圖（1～34 番）</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft JhengHei", sans-serif; }
+  #map { width: 100%; height: 100vh; }
+
+  .info-panel {
+    position: absolute; top: 10px; right: 10px; z-index: 1000;
+    background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    max-width: 380px; max-height: 90vh; overflow-y: auto; padding: 16px;
+    font-size: 14px; line-height: 1.6;
+  }
+  .info-panel h2 { font-size: 16px; margin-bottom: 8px; color: #2c3e50; }
+  .info-panel .close-btn {
+    position: absolute; top: 8px; right: 12px; cursor: pointer;
+    font-size: 20px; color: #999; background: none; border: none;
+  }
+  .info-panel .close-btn:hover { color: #333; }
+  .info-panel .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 12px; margin-right: 4px; margin-bottom: 4px;
+  }
+  .tag-danger { background: #f8d7da; color: #721c24; }
+  .tag-warning { background: #fff3cd; color: #856404; }
+  .tag-hotel { background: #cce5ff; color: #004085; }
+  .tag-ep { background: #e2e3e5; color: #383d41; }
+
+  .day-nav {
+    position: absolute; top: 10px; left: 60px; z-index: 1000;
+    display: flex; flex-wrap: wrap; gap: 4px; max-width: 600px;
+  }
+  .day-btn {
+    padding: 4px 10px; border: 1px solid #ccc; border-radius: 4px;
+    background: white; cursor: pointer; font-size: 12px;
+    font-family: "Microsoft JhengHei", sans-serif;
+  }
+  .day-btn:hover { background: #e3f2fd; }
+  .day-btn.active { background: #1976d2; color: white; border-color: #1976d2; }
+  .day-btn.all { background: #f5f5f5; font-weight: bold; }
+
+  .popup-content { font-size: 13px; line-height: 1.5; max-width: 280px; }
+  .popup-content h3 { font-size: 15px; margin-bottom: 4px; }
+  .popup-content .meta { color: #666; font-size: 12px; margin-bottom: 6px; }
+  .popup-content a { color: #1976d2; }
+
+  #loadingBar {
+    position: absolute; top: 0; left: 0; z-index: 2000;
+    width: 100%; height: 4px; background: #e0e0e0;
+  }
+  #loadingProgress {
+    height: 100%; width: 0; background: #1976d2;
+    transition: width 0.3s;
+  }
+  #loadingText {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 2000; background: rgba(25,118,210,0.9); color: white;
+    padding: 4px 16px; border-radius: 4px; font-size: 13px;
+  }
+
+  .leaflet-control-layers { font-family: "Microsoft JhengHei", sans-serif; font-size: 13px; }
+  .leaflet-control-layers-expanded { padding: 8px 12px; min-width: 220px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="loadingBar"><div id="loadingProgress"></div></div>
+<div id="loadingText">載入步行路線中...</div>
+
+<div class="day-nav" id="dayNav"></div>
+
+<div class="info-panel" id="infoPanel" style="display:none">
+  <button class="close-btn" onclick="document.getElementById('infoPanel').style.display='none'">&times;</button>
+  <div id="infoPanelContent"></div>
+</div>
+
+<script>
+// ===== MAP INIT =====
+const map = L.map('map', { zoomControl: true }).setView([33.85, 134.0], 9);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a> | Route: <a href="https://project-osrm.org">OSRM</a>',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+// ===== ICON FACTORY =====
+function makeIcon(color, size) {
+  return L.divIcon({
+    className: 'x',
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,
+    iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -size/2]
+  });
+}
+function makeNumIcon(color, num) {
+  return L.divIcon({
+    className: 'x',
+    html: `<div style="width:22px;height:22px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);color:white;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;">${num}</div>`,
+    iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -11]
+  });
+}
+const hotelIcon = makeIcon('#2196f3', 14);
+const hotelAltIcon = makeIcon('#7b1fa2', 12);
+const poiIcon = makeIcon('#ff9800', 14);
+
+// ===== DATA =====
+const temples = [
+  {n:1, name:'靈山寺', lat:34.159803, lng:134.502592, day:2, ep:1},
+  {n:2, name:'極樂寺', lat:34.155556, lng:134.490278, day:2, ep:1},
+  {n:3, name:'金泉寺', lat:34.147436, lng:134.468544, day:2, ep:1},
+  {n:4, name:'大日寺', lat:34.151306, lng:134.430889, day:2, ep:1},
+  {n:5, name:'地藏寺', lat:34.137222, lng:134.431944, day:2, ep:1},
+  {n:6, name:'安樂寺', lat:34.118056, lng:134.388389, day:2, ep:1},
+  {n:7, name:'十樂寺', lat:34.12075, lng:134.377925, day:3, ep:2},
+  {n:8, name:'熊谷寺', lat:34.122778, lng:134.34, day:3, ep:2},
+  {n:9, name:'法輪寺', lat:34.104378, lng:134.333814, day:3, ep:2},
+  {n:10, name:'切幡寺', lat:34.10775, lng:134.304278, day:3, ep:2},
+  {n:11, name:'藤井寺', lat:34.051667, lng:134.3485, day:4, ep:2, warn:'燒山寺起點'},
+  {n:12, name:'燒山寺', lat:33.985028, lng:134.31025, day:5, ep:3, warn:'第一難所！翻越3座山頭'},
+  {n:13, name:'大日寺', lat:34.038117, lng:134.462683, day:6, ep:4},
+  {n:14, name:'常樂寺', lat:34.050333, lng:134.475639, day:6, ep:4},
+  {n:15, name:'阿波國分寺', lat:34.055611, lng:134.473611, day:6, ep:4},
+  {n:16, name:'觀音寺', lat:34.068472, lng:134.474344, day:6, ep:4},
+  {n:17, name:'井戶寺', lat:34.085167, lng:134.485444, day:7, ep:5},
+  {n:18, name:'恩山寺', lat:33.986, lng:134.57825, day:7, ep:5},
+  {n:19, name:'立江寺', lat:33.967861, lng:134.605806, day:7, ep:5},
+  {n:20, name:'鶴林寺', lat:33.913861, lng:134.505611, day:8, ep:6, warn:'德島難所之一'},
+  {n:21, name:'太龍寺', lat:33.882528, lng:134.521889, day:8, ep:6, warn:'德島難所之一（有纜車）'},
+  {n:22, name:'平等寺', lat:33.851833, lng:134.582778, day:8, ep:6},
+  {n:23, name:'藥王寺', lat:33.732306, lng:134.527583, day:9, ep:7},
+  {n:24, name:'最御崎寺', lat:33.249008, lng:134.175739, day:11, ep:9},
+  {n:25, name:'津照寺', lat:33.287806, lng:134.14825, day:12, ep:10},
+  {n:26, name:'金剛頂寺', lat:33.307222, lng:134.122861, day:12, ep:10},
+  {n:27, name:'神峯寺', lat:33.467611, lng:133.974778, day:13, ep:11, warn:'陡峭山路上坡'},
+  {n:28, name:'大日寺', lat:33.577583, lng:133.705389, day:15, ep:12},
+  {n:29, name:'國分寺', lat:33.598694, lng:133.640417, day:15, ep:12},
+  {n:30, name:'善樂寺', lat:33.591917, lng:133.577556, day:16, ep:13},
+  {n:31, name:'竹林寺', lat:33.546611, lng:133.577472, day:16, ep:13},
+  {n:32, name:'禪師峰寺', lat:33.526694, lng:133.611389, day:17, ep:14},
+  {n:33, name:'雪蹊寺', lat:33.500833, lng:133.543083, day:17, ep:14},
+  {n:34, name:'種間寺', lat:33.491722, lng:133.487583, day:17, ep:14}
+];
+
+const jcHotels = [
+  {name:'料理旅館 大鳥居苑', lat:34.162, lng:134.505, day:1, ep:1, url:'https://ootoriien.com', note:'豐盛晚餐；離1番靈山寺近'},
+  {name:'安樂寺宿坊', lat:34.118, lng:134.389, day:2, ep:1, url:'https://shikoku6.or.jp', note:'溫泉療癒；晚課活動殊勝感動'},
+  {name:'民宿 あわらくや', lat:34.053, lng:134.35, day:3, ep:2, url:'http://wwwe.pikara.ne.jp/awarakuya/', note:'連住2晚攻燒山寺；老闆超幫忙訂房接送'},
+  {name:'すたち庵', lat:33.987, lng:134.312, day:5, ep:3, url:'', note:'燒山寺附近唯一選擇，常客滿！電話訂房'},
+  {name:'料理旅館 麟樓', lat:34.067, lng:134.474, day:6, ep:4, url:'https://urokorou.com/contact/', note:'150年老店；員工賣英文遍路指南'},
+  {name:'民宿 鮒の里', lat:33.968, lng:134.607, day:7, ep:5, url:'', note:'老闆遍路先達；接待46國旅客；免費載客'},
+  {name:'民宿 パンダヤ', lat:33.852, lng:134.584, day:8, ep:6, url:'', note:'生蛋納豆拌飯；西式床；5:00 morning call'},
+  {name:'壱 THE HOSTEL', lat:33.733, lng:134.528, day:9, ep:7, url:'https://ichithehostel.com/', note:'工業風；素泊；可借腳踏車'},
+  {name:'波流月 Guesthouse', lat:33.542, lng:134.298, day:10, ep:8, url:'http://guesthouse.haryugetu.net/', note:'衝浪風格；現煮咖啡；海陽町宍喰'},
+  {name:'Sakurahome & El Flamenquito', lat:33.25, lng:134.177, day:11, ep:9, url:'', note:'西班牙海鮮飯；超大家庭房附廚房'},
+  {name:'民宿 うらしま', lat:33.288, lng:134.149, day:12, ep:10, url:'https://minshukuurashima.com', note:''},
+  {name:'Hotel Nahari', lat:33.428, lng:134.023, day:13, ep:11, url:'https://www.hotel-nahari.net', note:'先放背包再輕裝攻27番（奈半利町）'},
+  {name:'Hotel Tamai', lat:33.498, lng:133.906, day:14, ep:12, url:'https://hotel-tamai.net', note:'Check-in在7樓；11樓高樓美景（安芸市）'},
+  {name:'高知黑潮飯店', lat:33.569, lng:133.693, day:15, ep:12, url:'', note:'有溫泉（香南市野市町）'},
+  {name:'Dormy Inn 高知', lat:33.559, lng:133.537, day:16, ep:13, url:'', note:'溫泉+冰棒+養樂多+宵夜拉麵（帯屋町）'},
+  {name:'Haruno Guest House', lat:33.50, lng:133.49, day:17, ep:14, url:'', note:'設施簡易但便宜'}
+];
+
+const altHotels = [
+  {name:'HOTEL AZ 德島板野店', lat:34.152, lng:134.475, day:2, ep:1, url:'https://www.az-hotel.com/itano/', note:'¥6,050含早餐；CP值極高'},
+  {name:'光明會館', lat:34.121, lng:134.378, day:3, ep:2, url:'https://jyuurakuji.com/', note:'¥10,670兩餐；房間大餐點豐盛'},
+  {name:'Sudachi-an', lat:33.988, lng:134.313, day:5, ep:3, url:'https://sudachian.com/', note:'¥7,900兩餐；免費行李寄送'},
+  {name:'名西旅館花', lat:34.04, lng:134.463, day:6, ep:4, url:'', note:'¥7,700兩餐；位置便利'},
+  {name:'HOSTEL PAQ', lat:34.074, lng:134.551, day:7, ep:5, url:'', note:'¥5,940含早餐；鄰近德島站'},
+  {name:'いやし亭心空', lat:33.883, lng:134.523, day:8, ep:6, url:'', note:'¥11,000兩餐；溫泉旅館'},
+  {name:'砂美かたやま', lat:33.48, lng:134.25, day:10, ep:8, url:'', note:'~NT$1,510素泊；海景優美'},
+  {name:'South Shore', lat:33.38, lng:134.15, day:11, ep:9, url:'', note:'¥8,400兩餐'},
+  {name:'民宿 室戶莊', lat:33.29, lng:134.16, day:11, ep:9, url:'', note:'¥8,300兩餐；魚料理驚艷'},
+  {name:'おうち宿しだお', lat:33.39, lng:134.05, day:12, ep:10, url:'', note:'¥8,000兩餐；26-27番之間'},
+  {name:'民宿 とうの浜', lat:33.453, lng:133.988, day:13, ep:11, url:'', note:'¥6,600兩餐；可寄行李攻27番'},
+  {name:'Guesthouse Suisennosato', lat:33.575, lng:133.708, day:15, ep:12, url:'', note:'¥5,000素泊；免費早餐行李寄送'},
+  {name:'EN Hostel', lat:33.56, lng:133.56, day:16, ep:13, url:'', note:'¥4,140素泊；高知市區'},
+  {name:'ohenrohouse33', lat:33.501, lng:133.544, day:17, ep:14, url:'https://ohenrohouse.com/33contact/', note:'¥5,000素泊；限女性；步行5分到33番'},
+  // === 46天遊記（小歐 2009）===
+  {name:'森本屋', lat:34.14, lng:134.44, day:2, ep:1, url:'', note:'【46天遊記】¥6,000（1餐）；1-5番'},
+  {name:'旅館八幡', lat:34.12, lng:134.38, day:3, ep:2, url:'', note:'【46天遊記】¥7,140（2餐）；6-10番'},
+  {name:'旅館吉野', lat:34.052, lng:134.35, day:4, ep:2, url:'', note:'【46天遊記】¥6,500（3餐！）；11番附近'},
+  {name:'燒山寺宿坊', lat:33.985, lng:134.31, day:5, ep:3, url:'', note:'【46天遊記】¥6,000（2餐）；12番寺內宿坊'},
+  {name:'金子屋', lat:33.97, lng:134.59, day:7, ep:5, url:'', note:'【46天遊記】¥6,200（3餐！）；18-19番'},
+  {name:'山茶花', lat:33.88, lng:134.52, day:8, ep:6, url:'', note:'【46天遊記】¥6,300（2餐）；20-21番'},
+  {name:'內妻莊', lat:33.62, lng:134.35, day:10, ep:8, url:'', note:'【46天遊記】¥6,825（2餐）；23-24番之間'},
+  {name:'ドライブイン27', lat:33.46, lng:133.98, day:13, ep:11, url:'', note:'【46天遊記】¥6,000（2餐）；27番附近'},
+  {name:'高須土佐飯店', lat:33.56, lng:133.62, day:15, ep:12, url:'', note:'【46天遊記】¥9,700/2人；28-30番'},
+  {name:'ビジネスイン土佐', lat:33.55, lng:133.54, day:17, ep:14, url:'', note:'【46天遊記】¥8,500/2人；31-34番'}
+];
+
+const pois = [
+  {name:'御廚人窟', lat:33.246, lng:134.173, day:11, ep:9, note:'空海大師得道之地'},
+  {name:'伊尾木洞', lat:33.494, lng:133.904, day:14, ep:12, note:'綠色蕨類古老洞穴（安芸市）'},
+  {name:'弘人市場', lat:33.559, lng:133.537, day:16, ep:13, note:'高知必遊；炙燒鰹魚（高普林！）'},
+  {name:'船遍路（種崎→長濱）', lat:33.514, lng:133.575, day:17, ep:14, note:'免費搭船3分鐘！'},
+  {name:'白色燈塔溫泉', lat:33.72, lng:134.53, day:9, ep:7, note:'海景溫泉推薦'},
+  {name:'藥妝店（日和佐站旁）', lat:33.733, lng:134.53, day:9, ep:7, note:'水泡貼/貼布補給站'},
+  {name:'德島拉麵 麵八', lat:34.07, lng:134.485, day:7, ep:5, note:'躲太陽好去處'},
+  {name:'武市神榮堂', lat:33.57, lng:133.68, day:15, ep:12, note:'草莓大福'},
+  {name:'明神丸', lat:33.559, lng:133.538, day:16, ep:13, note:'炙燒鰹魚名店'},
+  {name:'柳水庵', lat:34.02, lng:134.33, day:4, ep:2, note:'燒山寺分段休息點'}
+];
+
+const videoUrls = {
+  1:'https://www.youtube.com/watch?v=I3_8XGnf8gI', 2:'https://www.youtube.com/watch?v=i8yRSK9bB5g',
+  3:'https://www.youtube.com/watch?v=V3C8BODIGJg', 4:'https://www.youtube.com/watch?v=exVIOgbL65c',
+  5:'https://www.youtube.com/watch?v=eIKRFoONT-Y', 6:'https://www.youtube.com/watch?v=QXcsMxHLgWQ',
+  7:'https://www.youtube.com/watch?v=KadX7ciIWdg', 8:'https://www.youtube.com/watch?v=M0-f3-oEg5s',
+  9:'https://www.youtube.com/watch?v=b2-_dWF5ANY', 10:'https://www.youtube.com/watch?v=agrBIcghLxE',
+  11:'https://www.youtube.com/watch?v=K2v3C59mzh8', 12:'https://www.youtube.com/watch?v=LzFXoczIOR8',
+  13:'https://www.youtube.com/watch?v=7fbrS1qOSlY', 14:'https://www.youtube.com/watch?v=p7g9HW2J8bQ'
+};
+
+const dayData = {
+  1:{date:'4/10',dist:'1.2km',note:'移動日：桃園→關西→德島'},
+  2:{date:'4/11',dist:'18.82km',note:'正式開走；第一天腳就爆痛'},
+  3:{date:'4/12',dist:'24.96km',note:'雨天；鞋帶放鬆後改善'},
+  4:{date:'4/13',dist:'8.06km',note:'輕裝攻燒山寺前半段'},
+  5:{date:'4/14',dist:'11.39km',note:'燒山寺完成！天下無難事'},
+  6:{date:'4/15',dist:'28.02km',note:'離線地圖必備'},
+  7:{date:'4/16',dist:'27.47km',note:'大太陽考驗'},
+  8:{date:'4/17',dist:'26.34km/爬升1,216m',note:'一日雙難所（鶴林+太龍）'},
+  9:{date:'4/18',dist:'17.81km',note:'腳痛搭火車；藥妝店補給'},
+  10:{date:'4/19',dist:'32.52km',note:'最長一日'},
+  11:{date:'4/20',dist:'13.65km',note:'搭巴士；御廚人窟'},
+  12:{date:'4/21',dist:'18.74km',note:'鞋帶調鬆=水泡解決'},
+  13:{date:'4/22',dist:'30km',note:'先放包再輕裝攻27番'},
+  14:{date:'4/23',dist:'21km',note:'手機摔跤；自行車道更舒適'},
+  15:{date:'4/24',dist:'29.87km',note:'納經所差4分鐘關門'},
+  16:{date:'4/25',dist:'20.25km',note:'暴雨11度；鰹魚=高普林'},
+  17:{date:'4/26',dist:'27.38km',note:'船遍路免費；走路姿勢頓悟'}
+};
+
+// ===== LAYER GROUPS =====
+const layerTemples = L.layerGroup();
+const layerJCHotels = L.layerGroup();
+const layerAltHotels = L.layerGroup();
+const layerPois = L.layerGroup();
+const layerRouteTokushima = L.layerGroup();
+const layerRouteKochi = L.layerGroup();
+const layerRouteJC = L.layerGroup();
+
+// Add default visible layers
+[layerTemples, layerJCHotels, layerPois, layerRouteTokushima, layerRouteKochi].forEach(l => l.addTo(map));
+
+// ===== LAYER CONTROL =====
+const overlays = {
+  '🔴 札所（1～34番）': layerTemples,
+  '🟢 遍路道：德島段（1～23番）': layerRouteTokushima,
+  '🟠 遍路道：高知段（24～34番）': layerRouteKochi,
+  '🔵 Jesse&Carrie 住宿': layerJCHotels,
+  '🟣 其他推薦住宿': layerAltHotels,
+  '🟡 景點 / 注意點': layerPois,
+  '🩵 Jesse&Carrie 實際路線': layerRouteJC
+};
+L.control.layers(null, overlays, { collapsed: false, position: 'bottomright' }).addTo(map);
+
+// ===== OSRM WALKING ROUTE FETCHER =====
+async function fetchWalkingRoute(waypoints) {
+  const coords = waypoints.map(p => `${p[1]},${p[0]}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.code === 'Ok' && data.routes && data.routes[0]) {
+      return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    }
+  } catch (e) {
+    console.warn('OSRM fetch failed:', e);
+  }
+  return waypoints;
+}
+
+// Split long waypoint arrays into chunks for OSRM (max ~25 per request)
+async function fetchRouteSegmented(waypoints, chunkSize) {
+  const allCoords = [];
+  for (let i = 0; i < waypoints.length - 1; i += chunkSize - 1) {
+    const chunk = waypoints.slice(i, i + chunkSize);
+    if (chunk.length < 2) break;
+    const coords = await fetchWalkingRoute(chunk);
+    if (allCoords.length > 0) coords.shift();
+    allCoords.push(...coords);
+  }
+  return allCoords;
+}
+
+// ===== DRAW MARKERS =====
+function drawTemples() {
+  temples.forEach(t => {
+    const icon = t.warn ? makeNumIcon('#c62828', t.n) : makeNumIcon('#e74c3c', t.n);
+    const warnHtml = t.warn ? `<br><span style="color:#c62828;font-weight:bold">${t.warn}</span>` : '';
+    const epUrl = videoUrls[t.ep] || '#';
+    const m = L.marker([t.lat, t.lng], {icon}).bindPopup(`
+      <div class="popup-content">
+        <h3>${t.n}番 ${t.name}</h3>
+        <div class="meta">Day${t.day}｜<a href="${epUrl}" target="_blank">ep.${t.ep} 影片</a></div>
+        ${warnHtml}
+      </div>
+    `);
+    m._data = t;
+    layerTemples.addLayer(m);
+  });
+}
+
+function drawHotels(list, layer, icon, prefix) {
+  list.forEach(h => {
+    const urlHtml = h.url ? `<br><a href="${h.url}" target="_blank">官網</a>` : '';
+    const epUrl = videoUrls[h.ep] || '#';
+    const m = L.marker([h.lat, h.lng], {icon}).bindPopup(`
+      <div class="popup-content">
+        <h3>${prefix}${h.name}</h3>
+        <div class="meta">Day${h.day}｜<a href="${epUrl}" target="_blank">ep.${h.ep} 影片</a>${urlHtml}</div>
+        <div>${h.note}</div>
+      </div>
+    `);
+    m._data = h;
+    layer.addLayer(m);
+  });
+}
+
+function drawPois() {
+  pois.forEach(p => {
+    const epUrl = videoUrls[p.ep] || '#';
+    const m = L.marker([p.lat, p.lng], {icon: poiIcon}).bindPopup(`
+      <div class="popup-content">
+        <h3>${p.name}</h3>
+        <div class="meta">Day${p.day}｜<a href="${epUrl}" target="_blank">ep.${p.ep} 影片</a></div>
+        <div>${p.note}</div>
+      </div>
+    `);
+    m._data = p;
+    layerPois.addLayer(m);
+  });
+}
+
+// ===== PROGRESS BAR =====
+let totalRoutes = 3;
+let loadedRoutes = 0;
+function updateProgress() {
+  loadedRoutes++;
+  const pct = Math.round((loadedRoutes / totalRoutes) * 100);
+  document.getElementById('loadingProgress').style.width = pct + '%';
+  if (loadedRoutes >= totalRoutes) {
+    setTimeout(() => {
+      document.getElementById('loadingBar').style.display = 'none';
+      document.getElementById('loadingText').style.display = 'none';
+    }, 500);
+  }
+}
+
+// ===== BUILD ROUTES =====
+async function buildRoutes() {
+  // --- Route 1: Tokushima (temples 1-23) ---
+  const tokWaypoints = temples.filter(t => t.n <= 23).map(t => [t.lat, t.lng]);
+  const tokCoords = await fetchRouteSegmented(tokWaypoints, 12);
+  L.polyline(tokCoords, { color: '#2e7d32', weight: 4, opacity: 0.8 }).addTo(layerRouteTokushima);
+  updateProgress();
+
+  // --- Route 2: Kochi (temples 24-34) ---
+  const kocWaypoints = temples.filter(t => t.n >= 24).map(t => [t.lat, t.lng]);
+  const kocCoords = await fetchRouteSegmented(kocWaypoints, 12);
+  L.polyline(kocCoords, { color: '#e65100', weight: 4, opacity: 0.8 }).addTo(layerRouteKochi);
+  updateProgress();
+
+  // --- Route 3: Jesse & Carrie actual path (hotels in chronological order) ---
+  const jcStops = [
+    {lat:34.162, lng:134.505},       // Day1 大鳥居苑
+    {lat:34.159803, lng:134.502592}, // 1番
+    {lat:34.118056, lng:134.388389}, // 6番→安樂寺宿坊
+    {lat:34.12075, lng:134.377925},  // 7番
+    {lat:34.10775, lng:134.304278},  // 10番
+    {lat:34.053, lng:134.35},        // あわらくや
+    {lat:34.051667, lng:134.3485},   // 11番
+    {lat:33.985028, lng:134.31025},  // 12番
+    {lat:33.987, lng:134.312},       // すたち庵
+    {lat:34.038117, lng:134.462683}, // 13番
+    {lat:34.068472, lng:134.474344}, // 16番
+    {lat:34.067, lng:134.474},       // 麟樓
+    {lat:34.085167, lng:134.485444}, // 17番
+    {lat:33.967861, lng:134.605806}, // 19番→鮒の里
+    {lat:33.913861, lng:134.505611}, // 20番
+    {lat:33.851833, lng:134.582778}, // 22番→パンダヤ
+    {lat:33.732306, lng:134.527583}, // 23番→壱 HOSTEL
+    {lat:33.542, lng:134.298},       // 波流月
+    {lat:33.249008, lng:134.175739}, // 24番
+    {lat:33.25, lng:134.177},        // Sakurahome
+    {lat:33.307222, lng:134.122861}, // 26番
+    {lat:33.288, lng:134.149},       // うらしま
+    {lat:33.467611, lng:133.974778}, // 27番
+    {lat:33.428, lng:134.023},       // Hotel Nahari
+    {lat:33.498, lng:133.906},       // Hotel Tamai
+    {lat:33.577583, lng:133.705389}, // 28番
+    {lat:33.569, lng:133.693},       // 高知黑潮
+    {lat:33.598694, lng:133.640417}, // 29番
+    {lat:33.546611, lng:133.577472}, // 31番→Dormy Inn
+    {lat:33.526694, lng:133.611389}, // 32番
+    {lat:33.491722, lng:133.487583}, // 34番→Haruno
+  ];
+  const jcWaypoints = jcStops.map(s => [s.lat, s.lng]);
+  const jcCoords = await fetchRouteSegmented(jcWaypoints, 8);
+  L.polyline(jcCoords, { color: '#0288d1', weight: 3, opacity: 0.7, dashArray: '10,6' }).addTo(layerRouteJC);
+  updateProgress();
+}
+
+// ===== DAY NAV =====
+function buildDayNav() {
+  const nav = document.getElementById('dayNav');
+  const allBtn = document.createElement('button');
+  allBtn.className = 'day-btn all active';
+  allBtn.textContent = '全部';
+  allBtn.onclick = () => filterByDay(null);
+  nav.appendChild(allBtn);
+  for (let d = 1; d <= 17; d++) {
+    const btn = document.createElement('button');
+    btn.className = 'day-btn';
+    btn.textContent = `D${d}`;
+    btn.title = `Day${d} (${dayData[d].date}) ${dayData[d].dist}`;
+    btn.onclick = () => filterByDay(d);
+    nav.appendChild(btn);
+  }
+}
+
+function filterByDay(day) {
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+  if (day === null) {
+    document.querySelector('.day-btn.all').classList.add('active');
+  } else {
+    document.querySelectorAll('.day-btn')[day].classList.add('active');
+  }
+
+  const allItems = [
+    ...layerTemples.getLayers(),
+    ...layerJCHotels.getLayers(),
+    ...layerAltHotels.getLayers(),
+    ...layerPois.getLayers()
+  ];
+
+  allItems.forEach(m => {
+    if (!m._data) return;
+    if (day === null || m._data.day === day) {
+      m.setOpacity ? m.setOpacity(1) : (m._icon && (m._icon.style.opacity = '1'));
+    } else {
+      m.setOpacity ? m.setOpacity(0.15) : (m._icon && (m._icon.style.opacity = '0.15'));
+    }
+  });
+
+  if (day !== null) {
+    showDayInfo(day);
+    const dayItems = allItems.filter(m => m._data && m._data.day === day);
+    if (dayItems.length > 0) {
+      const bounds = L.latLngBounds(dayItems.map(m => m.getLatLng()));
+      map.fitBounds(bounds.pad(0.3));
+    }
+  } else {
+    document.getElementById('infoPanel').style.display = 'none';
+    const tBounds = L.latLngBounds(temples.map(t => [t.lat, t.lng]));
+    map.fitBounds(tBounds.pad(0.1));
+  }
+}
+
+function showDayInfo(day) {
+  const d = dayData[day];
+  const dt = temples.filter(t => t.day === day);
+  const dh = [...jcHotels, ...altHotels].filter(h => h.day === day);
+  const dp = pois.filter(p => p.day === day);
+  const eps = [...new Set([...dt.map(t=>t.ep), ...dh.map(h=>h.ep)])];
+
+  let html = `<h2>Day${day}（${d.date}）</h2>`;
+  html += `<p><strong>距離：</strong>${d.dist}</p>`;
+  html += `<p><strong>重點：</strong>${d.note}</p>`;
+  if (eps.length) { html += '<p>'; eps.forEach(ep => { html += `<a href="${videoUrls[ep]}" target="_blank" class="tag tag-ep">ep.${ep} 影片</a> `; }); html += '</p>'; }
+  if (dt.length) { html += '<p><strong>札所：</strong>'; dt.forEach(t => { html += `<span class="tag" style="background:#ffcdd2">${t.n}番 ${t.name}</span> `; }); html += '</p>'; dt.filter(t=>t.warn).forEach(w => { html += `<p><span class="tag tag-danger">${w.n}番 ${w.warn}</span></p>`; }); }
+  if (dh.length) { html += '<p><strong>住宿：</strong></p>'; dh.forEach(h => { const u = h.url ? ` <a href="${h.url}" target="_blank">[官網]</a>` : ''; html += `<p><span class="tag tag-hotel">${h.name}</span>${u}<br>${h.note}</p>`; }); }
+  if (dp.length) { html += '<p><strong>景點：</strong></p>'; dp.forEach(p => { html += `<p><span class="tag tag-warning">${p.name}</span><br>${p.note}</p>`; }); }
+
+  document.getElementById('infoPanelContent').innerHTML = html;
+  document.getElementById('infoPanel').style.display = 'block';
+}
+
+// ===== INIT =====
+drawTemples();
+drawHotels(jcHotels, layerJCHotels, hotelIcon, '');
+drawHotels(altHotels, layerAltHotels, hotelAltIcon, '【推薦】');
+drawPois();
+buildDayNav();
+buildRoutes();
+
+map.fitBounds(L.latLngBounds(temples.map(t => [t.lat, t.lng])).pad(0.1));
+</script>
+</body>
+</html>
