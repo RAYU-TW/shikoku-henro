@@ -500,6 +500,8 @@ const layerRouteTokushima = L.layerGroup();
 const layerRouteKochi = L.layerGroup();
 const layerHenroTrail = L.layerGroup();
 const layerHenroGpx = L.layerGroup();
+const layerDifficult = L.layerGroup();
+const layerHuts = L.layerGroup();
 
 const min88Icon = makeIcon('#009688', 8);
 
@@ -540,6 +542,8 @@ const overlays = {
   '🔴 札所（1～34番）': layerTemples,
   '🥾 遍路道 GPX（實走軌跡）': layerHenroGpx,
   '🗺️ 遍路道 OSM（社群路線）': layerHenroTrail,
+  '⚠️ 困難路段（紫色）': layerDifficult,
+  '🛖 遍路小屋 / 休憩所': layerHuts,
   '🟢 遍路道：德島段（OSRM）': layerRouteTokushima,
   '🟠 遍路道：高知段（OSRM）': layerRouteKochi,
   '🏠 min88 全住宿（142間）': layerMin88,
@@ -661,6 +665,44 @@ function drawHenroGpxTrail() {
     if (seg.length < 2) return;
     L.polyline(seg, { color: '#8b0000', weight: 3, opacity: 0.7 }).addTo(layerHenroGpx);
   });
+}
+
+// ===== DIFFICULT SECTIONS + HENRO HUTS (GitHub: orneh24) =====
+async function loadDifficultSections() {
+  try {
+    const res = await fetch('difficult_sections.geojson');
+    const data = await res.json();
+    L.geoJSON(data, {
+      style: { color: '#9c27b0', weight: 5, opacity: 0.8, dashArray: '8,4' },
+      onEachFeature: (feature, layer) => {
+        layer.bindPopup('<div class="popup-content"><h3>⚠️ 困難路段</h3><div style="font-size:12px;color:#888;">來源：Henro Helper App / orneh24</div></div>');
+      }
+    }).addTo(layerDifficult);
+  } catch (e) { console.warn('Failed to load difficult sections:', e); }
+}
+
+async function loadHenroHuts() {
+  try {
+    const res = await fetch('henro_huts.geojson');
+    const data = await res.json();
+    const hutIcon = makeIcon('#4caf50', 10);
+    data.features.forEach(f => {
+      const [lng, lat] = f.geometry.coordinates;
+      const p = f.properties || {};
+      const typeMap = { H: '遍路小屋', R: '休憩所', C: '露營地' };
+      const label = typeMap[p.Type] || '遍路小屋';
+      const name = p.Name || label;
+      const gmapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+      const m = L.marker([lat, lng], { icon: hutIcon }).bindPopup(`
+        <div class="popup-content">
+          <h3>🛖 ${name}</h3>
+          <div class="meta">${label}｜<a href="${gmapUrl}" target="_blank">Google Map</a></div>
+        </div>
+      `);
+      m._data = { name, day: 0 };
+      layerHuts.addLayer(m);
+    });
+  } catch (e) { console.warn('Failed to load henro huts:', e); }
 }
 
 // ===== HENRO TRAIL (OSM Overpass) =====
@@ -2052,6 +2094,8 @@ function exportGpx() {
 
 // ===== INIT =====
 drawHenroGpxTrail();
+loadDifficultSections();
+loadHenroHuts();
 drawShops();
 drawMin88();
 drawTemples();
