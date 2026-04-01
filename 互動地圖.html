@@ -149,6 +149,48 @@
   .rt-gpx-drop.dragover { border-color: #1976d2; background: #e3f2fd; color: #1976d2; }
   .rt-loading { text-align: center; padding: 8px; color: #1976d2; font-size: 13px; }
 
+  /* Itinerary Planner (Tab D) */
+  .itn-header { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .itn-header input { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 12px; }
+  .itn-day {
+    border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; overflow: hidden;
+  }
+  .itn-day-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; cursor: pointer; font-size: 13px; font-weight: bold;
+    user-select: none;
+  }
+  .itn-day-head:hover { filter: brightness(0.95); }
+  .itn-day-body { padding: 6px 10px 10px; border-top: 1px solid #e0e0e0; }
+  .itn-day-body.collapsed { display: none; }
+  .itn-day-stats { font-size: 11px; color: #666; font-weight: normal; }
+  .itn-stop {
+    display: flex; align-items: center; gap: 6px; padding: 5px 0;
+    border-bottom: 1px solid #f5f5f5; font-size: 12px;
+  }
+  .itn-stop:last-child { border-bottom: none; }
+  .itn-stop-num {
+    width: 18px; height: 18px; border-radius: 50%; color: white;
+    font-size: 9px; font-weight: bold; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .itn-stop-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .itn-stop-del { background: none; border: none; color: #c62828; cursor: pointer; font-size: 13px; flex-shrink: 0; }
+  .itn-stop-drag { cursor: grab; color: #bbb; flex-shrink: 0; font-size: 14px; }
+  .itn-add-row { display: flex; gap: 4px; margin-top: 6px; }
+  .itn-add-row input { flex: 1; padding: 5px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; font-family: inherit; }
+  .itn-add-row button { padding: 5px 8px; font-size: 11px; }
+  .itn-seg { padding: 1px 0 1px 24px; font-size: 10px; color: #999; }
+  .itn-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .itn-actions button { flex: 1; min-width: 0; }
+  .itn-save-list { margin-top: 8px; }
+  .itn-save-item {
+    display: flex; align-items: center; gap: 6px; padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0; font-size: 12px;
+  }
+  .itn-save-item span { flex: 1; cursor: pointer; color: #1976d2; }
+  .itn-save-item span:hover { text-decoration: underline; }
+
   @media (max-width: 640px) {
     .rt-toggle { top: auto; bottom: 20px; left: 10px; transform: none; }
     .rt-toolbar {
@@ -177,6 +219,7 @@
   <div class="rt-tabs">
     <button class="rt-tab active" data-tab="editor">途經點</button>
     <button class="rt-tab" data-tab="planner">住宿規劃</button>
+    <button class="rt-tab" data-tab="itinerary">行程規劃</button>
     <button class="rt-tab" data-tab="gpx">GPX</button>
   </div>
   <div class="rt-body">
@@ -216,6 +259,28 @@
       <div class="rt-hotel-list" id="hotelList"></div>
       <button class="rt-btn rt-btn-primary" style="margin-top:8px" onclick="generatePlanRoute()">產生路線</button>
       <div id="planStats"></div>
+    </div>
+    <!-- Tab D: Itinerary Planner -->
+    <div class="rt-panel" id="panelItinerary">
+      <div class="itn-header">
+        <label style="font-size:12px;">起始日</label>
+        <input type="date" id="itnStartDate" value="2026-04-14" style="width:130px;">
+        <label style="font-size:12px;">天數</label>
+        <input type="number" id="itnDays" value="14" min="1" max="60" style="width:50px;">
+        <button class="rt-btn rt-btn-primary" style="width:auto;padding:5px 10px;font-size:12px;" onclick="itnBuildDays()">套用</button>
+      </div>
+      <div id="itnDayList"></div>
+      <div class="itn-actions">
+        <button class="rt-btn rt-btn-primary" style="font-size:12px;" onclick="itnCalcAllRoutes()">計算全部路線</button>
+        <button class="rt-btn rt-btn-secondary" style="font-size:12px;" onclick="itnShowOnMap()">顯示在地圖</button>
+      </div>
+      <div class="itn-actions">
+        <button class="rt-btn rt-btn-secondary" style="font-size:12px;" onclick="itnSave()">儲存行程</button>
+        <button class="rt-btn rt-btn-secondary" style="font-size:12px;" onclick="itnExportJson()">匯出 JSON</button>
+        <button class="rt-btn rt-btn-secondary" style="font-size:12px;" onclick="document.getElementById('itnImportFile').click()">匯入</button>
+        <input type="file" id="itnImportFile" accept=".json" style="display:none" onchange="itnImportJson(event)">
+      </div>
+      <div id="itnSavedList" class="itn-save-list"></div>
     </div>
     <!-- Tab C: GPX -->
     <div class="rt-panel" id="panelGpx">
@@ -788,6 +853,7 @@ document.querySelectorAll('.rt-tab').forEach(tab => {
     tab.classList.add('active');
     document.getElementById('panel' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).classList.add('active');
     if (tab.dataset.tab !== 'editor' && rtEditor.active) toggleEditMode();
+    if (tab.dataset.tab !== 'itinerary' && itn.addingToDay >= 0) { itn.addingToDay = -1; map.getContainer().style.cursor = ''; map.off('click', itnOnMapClick); map.off('popupopen', itnOnPopupOpen); }
   };
 });
 
@@ -1341,6 +1407,347 @@ async function generatePlanRoute() {
   }
 }
 
+// ===== ITINERARY PLANNER (Feature D) =====
+const DAY_COLORS = ['#e53935','#d81b60','#8e24aa','#5e35b1','#3949ab','#1e88e5','#039be5','#00acc1','#00897b','#43a047','#7cb342','#c0ca33','#fdd835','#ffb300','#fb8c00','#f4511e','#6d4c41','#546e7a','#78909c','#455a64'];
+const itn = {
+  days: [],        // [{date, stops: [{lat,lng,name}], legs: [{dist,dur}], elevs: []}]
+  routeLayer: L.layerGroup().addTo(map),
+  markerLayer: L.layerGroup().addTo(map),
+  addingToDay: -1  // which day is in "add mode"
+};
+
+function itnBuildDays() {
+  const startStr = document.getElementById('itnStartDate').value;
+  const numDays = parseInt(document.getElementById('itnDays').value) || 14;
+  const startDate = startStr ? new Date(startStr) : new Date('2026-04-14');
+
+  // preserve existing stops if day count changed
+  const oldDays = itn.days;
+  itn.days = [];
+  for (let i = 0; i < numDays; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = (d.getMonth() + 1) + '/' + d.getDate();
+    const old = oldDays[i];
+    itn.days.push({
+      date: dateStr,
+      fullDate: d.toISOString().slice(0, 10),
+      stops: old ? old.stops : [],
+      legs: old ? old.legs : [],
+      elevs: old ? old.elevs : []
+    });
+  }
+  itnRender();
+  itnSaveAuto();
+}
+
+function itnRender() {
+  const el = document.getElementById('itnDayList');
+  let html = '';
+  itn.days.forEach((day, di) => {
+    const color = DAY_COLORS[di % DAY_COLORS.length];
+    const isAdding = itn.addingToDay === di;
+    // calc day stats
+    let totalDist = 0, totalDur = 0;
+    (day.legs || []).forEach(l => { totalDist += l.dist || 0; totalDur += l.dur || 0; });
+    let elevGain = 0, elevLoss = 0;
+    if (day.elevs && day.elevs.length >= 2) {
+      for (let e = 1; e < day.elevs.length; e++) {
+        const diff = day.elevs[e] - day.elevs[e - 1];
+        if (diff > 0) elevGain += diff; else elevLoss += Math.abs(diff);
+      }
+    }
+    const km = (totalDist / 1000).toFixed(1);
+    const h = Math.floor(totalDur / 3600);
+    const m = Math.round((totalDur % 3600) / 60);
+    const statsHtml = day.stops.length >= 2
+      ? `<span class="itn-day-stats">${km}km ・ ${h}h${m}m${elevGain ? ' ↑' + Math.round(elevGain) + 'm' : ''}${elevLoss ? ' ↓' + Math.round(elevLoss) + 'm' : ''}</span>`
+      : `<span class="itn-day-stats">${day.stops.length} 站</span>`;
+
+    html += `<div class="itn-day">
+      <div class="itn-day-head" style="background:${color}22;border-left:4px solid ${color};" onclick="itnToggleDay(${di})">
+        <span>Day ${di + 1} <span style="font-weight:normal;font-size:11px;color:#888;">${day.date}</span></span>
+        ${statsHtml}
+      </div>
+      <div class="itn-day-body${day._collapsed ? ' collapsed' : ''}" id="itnBody${di}">`;
+
+    day.stops.forEach((s, si) => {
+      html += `<div class="itn-stop">
+        <span class="itn-stop-num" style="background:${color};">${si + 1}</span>
+        <span class="itn-stop-name" title="${s.name || ''}">${s.name || s.lat.toFixed(4) + ',' + s.lng.toFixed(4)}</span>
+        ${day.elevs && day.elevs[si] != null ? '<span style="font-size:10px;color:#888;">⛰' + day.elevs[si] + 'm</span>' : ''}
+        <button class="itn-stop-del" onclick="itnRemoveStop(${di},${si})">✕</button>
+      </div>`;
+      // segment info
+      if (si < day.stops.length - 1 && day.legs && day.legs[si]) {
+        const lk = (day.legs[si].dist / 1000).toFixed(1);
+        const lh = Math.floor(day.legs[si].dur / 3600);
+        const lm = Math.round((day.legs[si].dur % 3600) / 60);
+        let ediff = '';
+        if (day.elevs && day.elevs[si] != null && day.elevs[si + 1] != null) {
+          const d = day.elevs[si + 1] - day.elevs[si];
+          ediff = d >= 0 ? ` <span style="color:#c62828;">↑${Math.abs(Math.round(d))}m</span>` : ` <span style="color:#1565c0;">↓${Math.abs(Math.round(d))}m</span>`;
+        }
+        html += `<div class="itn-seg">↕ ${lk}km ・ ${lh > 0 ? lh + 'h' : ''}${lm}m${ediff}</div>`;
+      }
+    });
+
+    // add stop input
+    html += `<div class="itn-add-row">
+      <input type="text" id="itnInput${di}" placeholder="貼 Google Map 網址、座標，或點地圖" onkeydown="if(event.key==='Enter'){itnAddFromInput(${di});}">
+      <button class="rt-btn rt-btn-primary" style="width:auto;padding:4px 8px;font-size:11px;" onclick="itnAddFromInput(${di})">加</button>
+      <button class="rt-btn ${isAdding ? 'rt-btn-primary editing' : 'rt-btn-secondary'}" style="width:auto;padding:4px 8px;font-size:11px;" onclick="itnToggleMapAdd(${di})">${isAdding ? '點擊中...' : '點地圖'}</button>
+    </div>`;
+
+    html += `</div></div>`;
+  });
+  el.innerHTML = html;
+  itnRenderSavedList();
+}
+
+function itnToggleDay(di) {
+  itn.days[di]._collapsed = !itn.days[di]._collapsed;
+  const body = document.getElementById('itnBody' + di);
+  if (body) body.classList.toggle('collapsed');
+}
+
+function itnToggleMapAdd(di) {
+  if (itn.addingToDay === di) {
+    itn.addingToDay = -1;
+    map.getContainer().style.cursor = '';
+    map.off('click', itnOnMapClick);
+    map.off('popupopen', itnOnPopupOpen);
+  } else {
+    itn.addingToDay = di;
+    map.getContainer().style.cursor = 'crosshair';
+    map.off('click', itnOnMapClick);
+    map.off('popupopen', itnOnPopupOpen);
+    map.on('click', itnOnMapClick);
+    map.on('popupopen', itnOnPopupOpen);
+  }
+  itnRender();
+}
+
+function itnOnMapClick(e) {
+  if (itn.addingToDay < 0) return;
+  const near = findNearestTemple(e.latlng.lat, e.latlng.lng);
+  const name = near && parseFloat(near.dist) < 2 ? near.n + '番 ' + near.name : '';
+  itnAddStop(itn.addingToDay, e.latlng.lat, e.latlng.lng, name);
+}
+
+function itnOnPopupOpen(e) {
+  if (itn.addingToDay < 0) return;
+  const marker = e.popup._source;
+  if (!marker || !marker._data) return;
+  const container = e.popup.getElement();
+  if (!container || container.querySelector('.itn-add-btn')) return;
+  const ll = marker.getLatLng();
+  const d = marker._data;
+  const name = d.n ? (d.n + '番 ' + (d.name || '')) : (d.name || '');
+  const btn = document.createElement('button');
+  btn.className = 'itn-add-btn';
+  btn.textContent = '＋ Day ' + (itn.addingToDay + 1) + ' 加入' + (name ? '（' + name + '）' : '');
+  btn.style.cssText = 'display:block;width:100%;margin-top:6px;padding:5px;background:#43a047;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;';
+  btn.onmouseover = () => btn.style.background = '#388e3c';
+  btn.onmouseout = () => btn.style.background = '#43a047';
+  btn.onclick = (ev) => { ev.stopPropagation(); itnAddStop(itn.addingToDay, ll.lat, ll.lng, name); marker.closePopup(); };
+  const content = container.querySelector('.leaflet-popup-content');
+  if (content) content.appendChild(btn);
+}
+
+function itnAddFromInput(di) {
+  const input = document.getElementById('itnInput' + di);
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) return;
+  const result = parseGmapInput(raw);
+  if (!result) { input.style.borderColor = '#c62828'; setTimeout(() => input.style.borderColor = '#ddd', 1500); return; }
+  itnAddStop(di, result.lat, result.lng, result.name);
+  input.value = '';
+}
+
+function itnAddStop(di, lat, lng, name) {
+  if (!itn.days[di]) return;
+  itn.days[di].stops.push({ lat, lng, name: name || '' });
+  itn.days[di].legs = [];
+  itn.days[di].elevs = [];
+  itnRender();
+  itnSaveAuto();
+}
+
+function itnRemoveStop(di, si) {
+  itn.days[di].stops.splice(si, 1);
+  itn.days[di].legs = [];
+  itn.days[di].elevs = [];
+  itnRender();
+  itnSaveAuto();
+}
+
+async function itnCalcDayRoute(di) {
+  const day = itn.days[di];
+  if (day.stops.length < 2) { day.legs = []; day.elevs = []; return; }
+  const pts = day.stops.map(s => [s.lat, s.lng]);
+  try {
+    const result = await fetchRouteWithStats(pts);
+    if (result && result.legs) {
+      day.legs = result.legs.map(l => ({ dist: l.distance, dur: l.duration }));
+      day._routeCoords = result.coords;
+    }
+  } catch (e) { day.legs = []; }
+  // elevations
+  try {
+    const locs = pts.map(p => ({ latitude: p[0], longitude: p[1] }));
+    const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locations: locs })
+    });
+    const data = await res.json();
+    if (data.results) day.elevs = data.results.map(r => r.elevation);
+  } catch (e) { day.elevs = []; }
+}
+
+async function itnCalcAllRoutes() {
+  const btn = document.querySelector('.itn-actions .rt-btn-primary');
+  if (btn) btn.textContent = '計算中...';
+  for (let di = 0; di < itn.days.length; di++) {
+    await itnCalcDayRoute(di);
+  }
+  if (btn) btn.textContent = '計算全部路線';
+  itnRender();
+  itnSaveAuto();
+  itnShowOnMap();
+}
+
+function itnShowOnMap() {
+  itn.routeLayer.clearLayers();
+  itn.markerLayer.clearLayers();
+  itn.days.forEach((day, di) => {
+    if (!day._routeCoords || day._routeCoords.length < 2) return;
+    const color = DAY_COLORS[di % DAY_COLORS.length];
+    L.polyline(day._routeCoords, { color, weight: 4, opacity: 0.8 }).addTo(itn.routeLayer);
+    // day label at first stop
+    if (day.stops.length > 0) {
+      const s = day.stops[0];
+      const label = L.divIcon({
+        className: 'x',
+        html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.3);">D${di + 1}</div>`,
+        iconAnchor: [-4, 12]
+      });
+      L.marker([s.lat, s.lng], { icon: label, interactive: false }).addTo(itn.markerLayer);
+    }
+  });
+  // fit bounds
+  const allPts = itn.days.flatMap(d => d.stops.map(s => [s.lat, s.lng]));
+  if (allPts.length > 0) map.fitBounds(L.latLngBounds(allPts).pad(0.1));
+}
+
+// Save / Load
+function itnSaveAuto() {
+  const data = itn.days.map(d => ({
+    date: d.date, fullDate: d.fullDate,
+    stops: d.stops, legs: d.legs, elevs: d.elevs
+  }));
+  localStorage.setItem('henro_itn_current', JSON.stringify(data));
+}
+
+function itnLoadAuto() {
+  try {
+    const data = JSON.parse(localStorage.getItem('henro_itn_current'));
+    if (data && data.length) {
+      itn.days = data.map(d => ({ ...d, _collapsed: false, _routeCoords: null }));
+      document.getElementById('itnDays').value = data.length;
+      if (data[0] && data[0].fullDate) document.getElementById('itnStartDate').value = data[0].fullDate;
+      itnRender();
+      return;
+    }
+  } catch (e) {}
+  itnBuildDays();
+}
+
+function itnSave() {
+  const name = prompt('行程名稱：', '四國遍路 ' + itn.days.length + '天');
+  if (!name) return;
+  const saved = JSON.parse(localStorage.getItem('henro_itn_saved') || '[]');
+  const data = itn.days.map(d => ({
+    date: d.date, fullDate: d.fullDate,
+    stops: d.stops, legs: d.legs, elevs: d.elevs
+  }));
+  saved.push({ name, time: new Date().toISOString(), data });
+  localStorage.setItem('henro_itn_saved', JSON.stringify(saved));
+  itnRenderSavedList();
+}
+
+function itnLoadSaved(idx) {
+  const saved = JSON.parse(localStorage.getItem('henro_itn_saved') || '[]');
+  if (!saved[idx]) return;
+  itn.days = saved[idx].data.map(d => ({ ...d, _collapsed: false, _routeCoords: null }));
+  document.getElementById('itnDays').value = itn.days.length;
+  if (itn.days[0] && itn.days[0].fullDate) document.getElementById('itnStartDate').value = itn.days[0].fullDate;
+  itnRender();
+  itnSaveAuto();
+}
+
+function itnDeleteSaved(idx) {
+  const saved = JSON.parse(localStorage.getItem('henro_itn_saved') || '[]');
+  saved.splice(idx, 1);
+  localStorage.setItem('henro_itn_saved', JSON.stringify(saved));
+  itnRenderSavedList();
+}
+
+function itnRenderSavedList() {
+  const saved = JSON.parse(localStorage.getItem('henro_itn_saved') || '[]');
+  const el = document.getElementById('itnSavedList');
+  if (saved.length === 0) { el.innerHTML = ''; return; }
+  let html = '<div style="font-size:12px;font-weight:bold;margin-top:8px;padding-bottom:4px;border-bottom:1px solid #ddd;">已儲存的行程</div>';
+  saved.forEach((s, i) => {
+    const d = new Date(s.time);
+    const timeStr = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+    html += `<div class="itn-save-item">
+      <span onclick="itnLoadSaved(${i})">${s.name}</span>
+      <span style="font-size:10px;color:#aaa;flex:none;">${timeStr}</span>
+      <button class="itn-stop-del" onclick="itnDeleteSaved(${i})">✕</button>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function itnExportJson() {
+  const data = {
+    name: '四國遍路行程',
+    exported: new Date().toISOString(),
+    days: itn.days.map(d => ({
+      date: d.date, fullDate: d.fullDate,
+      stops: d.stops, legs: d.legs, elevs: d.elevs
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'shikoku-itinerary.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function itnImportJson(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.days && data.days.length) {
+        itn.days = data.days.map(d => ({ ...d, _collapsed: false, _routeCoords: null }));
+        document.getElementById('itnDays').value = itn.days.length;
+        if (itn.days[0] && itn.days[0].fullDate) document.getElementById('itnStartDate').value = itn.days[0].fullDate;
+        itnRender();
+        itnSaveAuto();
+      }
+    } catch (err) { alert('JSON 格式錯誤'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
 // ===== GPX IMPORT/EXPORT (Feature C) =====
 const gpxLayer = L.layerGroup().addTo(map);
 
@@ -1483,6 +1890,7 @@ map.fitBounds(L.latLngBounds(temples.map(t => [t.lat, t.lng])).pad(0.1));
 // Route toolbar init
 buildHotelList();
 loadEditorState();
+itnLoadAuto();
 </script>
 </body>
 </html>
